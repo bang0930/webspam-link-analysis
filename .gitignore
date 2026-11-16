@@ -1,0 +1,12 @@
+# 원본 데이터는 라이선스상 재배포하지 않음 (scripts/download_data.py로 받기)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
