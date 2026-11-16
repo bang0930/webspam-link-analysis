@@ -66,7 +66,11 @@ def main() -> None:
         print(f"       sha256 {sha256(path)}")
         if path.name.endswith(".tar.gz"):
             with tarfile.open(path) as tar:
-                tar.extractall(RAW_DIR, filter="data")
+                # filter 인자는 Python 3.12+ (일부 3.8~3.11 패치 버전)에서만 지원
+                if hasattr(tarfile, "data_filter"):
+                    tar.extractall(RAW_DIR, filter="data")
+                else:
+                    tar.extractall(RAW_DIR)
             print(f"       압축 해제 완료")
     print(f"\n완료: {RAW_DIR}")
 

@@ -13,7 +13,7 @@ WEBSPAM-UK2007 (Yahoo! Research Barcelona, Web Spam Challenge 2008)
 python scripts/download_data.py
 ```
 
-Python 3.8+ 표준 라이브러리만 사용합니다. `data/raw/` 아래에 저장되며, 이미 받은 파일은 건너뜁니다.
+Python 3.10 이상, 표준 라이브러리만 사용합니다 (권장 버전은 `requirements.txt`와 함께 확정 예정). `data/raw/` 아래에 저장되며, 이미 받은 파일은 건너뜁니다.
 
 ### 받는 파일
 
