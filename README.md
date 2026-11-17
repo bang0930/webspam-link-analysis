@@ -34,15 +34,17 @@ SCE331 Data Mining Team Project
 ```
 webspam-link-analysis/
 ├── README.md
-├── requirements.txt           # 🚧 라이브러리 버전 고정
+├── requirements.txt           # 라이브러리 버전 고정
+├── splits.json                # SET1 도메인 단위 5-fold (hostid와 fold 번호만)
+├── eval_set.json              # 최종 채점 대상 hostid
 ├── docs/
 │   ├── STRUCTURE.md           # 프로젝트 확정안
 │   └── AI_USAGE.md            # AI 사용 기록
 ├── scripts/
 │   └── download_data.py       # 원본 데이터 다운로드
-├── src/                       # 🚧
+├── src/                       # 🚧 일부 작성 중
 │   ├── config.py              # 경로, 랜덤 seed, 기본 parameter
-│   ├── load_graph.py          # 그래프·라벨 불러오기
+│   ├── load_graph.py          # 그래프(0·1 희소행렬)·라벨 불러오기, 캐시
 │   ├── splits.py              # 도메인 단위 분할, 채점 대상 고정
 │   ├── seeds.py               # TrustRank seed 선택
 │   ├── engine.py              # 공통 power iteration 엔진
@@ -56,6 +58,7 @@ webspam-link-analysis/
 ├── experiments/               # 🚧
 │   ├── run_main.py            # 점수 → 채점 → 표 → 그림
 │   └── run_sensitivity.py     # 분석 곡선
+├── tests/                     # pytest (합성 데이터 + 실제 데이터 통계 대조)
 ├── notebooks/                 # EDA·확인용 (보고서 그림은 만들지 않음)
 ├── results/
 │   ├── tables/                # 결과 표 (.csv)
@@ -65,12 +68,21 @@ webspam-link-analysis/
 
 ## Environment / Setup
 
-- Python 3.10 이상
-- 🚧 라이브러리 설치
+- Python 3.12 이상 (`requirements.txt`의 numpy·scipy·networkx 버전이 3.12+를 요구)
+- 라이브러리 설치 (가상환경 권장)
 
+```bash
+python -m venv .venv
+```
+```bash
+source .venv/bin/activate
+```
 ```bash
 pip install -r requirements.txt
 ```
+
+- 모든 명령은 저장소 루트에서 `python -m ...` 형태로 실행합니다.
+- 테스트: `python -m pytest tests -q` (데이터를 받은 뒤 실행하면 실제 데이터 통계까지 확인)
 
 - 🚧 실험 환경 (보고서 기재용): OS, CPU, 메모리, Python 버전, 주요 라이브러리 버전
 
@@ -86,7 +98,15 @@ WEBSPAM-UK2007 (Yahoo! Research Barcelona, Web Spam Challenge 2008)
 python scripts/download_data.py
 ```
 
-표준 라이브러리만 사용합니다. `data/raw/` 아래에 저장되며, 이미 받은 파일은 건너뜁니다.
+표준 라이브러리만 사용합니다 (Python 3.10 이상이면 실행 가능). `data/raw/` 아래에 저장되며, 이미 받은 파일은 건너뜁니다.
+
+받은 데이터가 정상인지 확인:
+
+```bash
+python -m src.load_graph
+```
+
+host 수, edge 수, dangling 수, 라벨 수를 알려진 값과 대조해 `[ok ]`/`[err]`로 출력합니다. 처음 실행 때 `data/processed/`에 그래프 캐시를 만들고, 원본이 바뀌면 캐시를 다시 만듭니다 (`--force`로 강제 재생성).
 
 ### 받는 파일
 
@@ -190,7 +210,7 @@ python experiments/run_sensitivity.py    # 3. 분석 곡선 (damping, seed 개�
 - J. Leskovec, A. Rajaraman, J. Ullman, *Mining of Massive Datasets*
 - SCE331 강의 자료 4강(LSH), 11강(Link Analysis)
 
-외부 라이브러리: numpy, scipy, pandas, scikit-learn(평가 지표), networkx(PageRank 검증), matplotlib — 🚧 버전은 `requirements.txt`에 명시
+외부 라이브러리: numpy, scipy, pandas, scikit-learn(분할·평가 지표), networkx(PageRank 검증), matplotlib, pytest — 버전은 `requirements.txt`에 고정
 
 외부 코드를 가져오거나 수정해 쓴 경우 해당 파일 머리말에 출처와 라이선스를 적습니다. 🚧 현재 없음
 

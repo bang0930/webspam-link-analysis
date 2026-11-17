@@ -1,0 +1,10 @@
+# Python 3.12 이상 (numpy·scipy·networkx 최신 버전이 3.12+를 요구함)
+# 설치: pip install -r requirements.txt
+# 버전을 바꾸면 splits.json(StratifiedGroupKFold 결과)이 달라질 수 있으니 팀에 먼저 알릴 것
+numpy==2.5.5
+scipy==1.18.1
+pandas==3.1.1
+scikit-learn==1.9.1
+networkx==3.7
+matplotlib==3.11.2
+pytest==9.2.0
