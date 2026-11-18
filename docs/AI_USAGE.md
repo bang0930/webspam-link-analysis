@@ -10,3 +10,4 @@ AI 도움을 받을 때마다 아래 표에 한 줄씩 추가해 주세요.
 |---|---|---|---|---|---|
 | 2026-11-09 ~ 11-16 | 김현중 | Claude Code (Anthropic) / Claude Sonnet 5.5, Claude Opus 5.5 | 과제 안내문 정리, 주제 후보 비교, 프로젝트 구조 초안 작성 | `docs/STRUCTURE.md` | 과제 안내 PDF와 강의 슬라이드(4강, 11강)를 직접 대조, 팀 회의에서 검토 예정 |
 | 2026-11-16 | 김현중 | Claude Code (Anthropic) / Claude Opus 5.5 | 데이터 다운로드 스크립트, `.gitignore`, README 데이터 섹션 작성, 데이터 기본 통계 확인 | `scripts/download_data.py`, `.gitignore`, `README.md` | 스크립트를 직접 실행해 파일 크기와 라벨 개수가 배포처 README의 통계와 일치하는지 확인 |
+| 2026-11-16 | 강민수 | Claude (Anthropic) / Claude Opus 5.5 | `splits.py`, `evaluate.py` 및 테스트 초안 작성 | `src/splits.py`, `src/evaluate.py`, `tests/` | 합성 데이터 pytest 12개 통과 확인, 실제 데이터 겹침 0개 확인은 load_graph 완성 후 |
