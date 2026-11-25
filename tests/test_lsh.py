@@ -107,3 +107,40 @@ def test_run_lsh_filter_and_determinism():
         H.run_lsh(A, [10], [12], bands_rows=(16, 4))            # b·r ≠ num_perm
     with pytest.raises(ValueError):
         H.run_lsh(A, [10], [10], bands_rows=(32, 4))            # spam·nonspam 겹침
+
+
+# ---------------------------------------------------------------------------
+# 구조/점수 분리, 검증용 score_fn, S-curve
+# ---------------------------------------------------------------------------
+def test_build_score_split_matches_run_lsh():
+    A = _scenario()
+    whole = H.run_lsh(A, [10, 11, 15], [12, 40, 41], bands_rows=(32, 4))
+    st = H.build_lsh(A, bands_rows=(32, 4))
+    scores, covered, p = H.score_lsh(st, [10, 11, 15], [12, 40, 41])
+    assert np.array_equal(scores, whole.scores) and np.array_equal(covered, whole.covered)
+    # 같은 구조로 라벨만 바꿔 다시 매길 수 있음 (검증 fold마다 구조를 다시 안 만듦)
+    fn = H.make_score_fn(A, bands_rows=(32, 4))
+    assert np.array_equal(fn([10, 11, 15], [12, 40, 41]), whole.scores)
+    assert not np.array_equal(fn([12], [10]), whole.scores)
+    assert H.setting_name(1, (16, 8)) == "lsh_min1_b16r8"
+
+
+def test_theory_and_band_check():
+    assert H.theoretical_curve(0.0, 16, 8) == 0.0
+    assert H.theoretical_curve(1.0, 16, 8) == 1.0
+    # 강의 4강 p56 표: b=20, r=5, t=0.8 → 0.9996
+    assert H.theoretical_curve(0.8, 20, 5) == pytest.approx(0.9996, abs=1e-4)
+    sig = np.array([[1, 1, 2], [3, 3, 4], [5, 6, 5], [7, 8, 7]])
+    pairs = np.array([[0, 1], [0, 2], [1, 2]])
+    assert H.shares_band(sig, pairs, bands=2, rows=2).tolist() == [True, True, False]
+
+
+def test_sample_pairs_and_scurve():
+    A = _scenario()
+    st = H.build_lsh(A, bands_rows=(32, 4))
+    pairs = H.sample_pairs(st.S_rep, 50, seed=1)
+    assert (pairs[:, 0] < pairs[:, 1]).all()
+    assert (H.exact_jaccard(st.S_rep, pairs) > 0).all()        # 원소를 공유하는 쌍만
+    df, summ = H.scurve(st, n_pairs=50, n_bins=10)
+    assert {"jaccard_lo", "candidate_rate", "theory_mid", "n_pairs"} <= set(df.columns)
+    assert 0 <= summ["recall_final"] <= 1 and summ["n_above_threshold"] >= 1

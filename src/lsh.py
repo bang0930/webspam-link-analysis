@@ -16,11 +16,15 @@
 - 커버 = 라벨된 이웃이 1개 이상인 host.
 - 라벨은 호출하는 쪽이 넘긴다: 검증 땐 seed용 fold 라벨만, 최종 땐 SET1 전체. SET2는 절대 넘기지 않는다.
 
-실행: python -m src.lsh   (설정별 후보 쌍 수·시간·커버리지를 출력, SET1 라벨만 사용)
+실행 (모두 SET1 라벨만 사용, SET2는 읽지 않음)
+    python -m src.lsh            설정 15개의 후보 쌍 수·시간·커버리지 -> results/tables/lsh_candidate_counts.csv
+    python -m src.lsh validate   검증 5-fold로 (b, r)·최소 집합 크기 고르기 -> results/tables/lsh_validation.csv
+    python -m src.lsh scurve     근사 품질: S-curve(이론 vs 실제), recall -> results/tables/lsh_scurve*.csv + 그림
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from dataclasses import dataclass, field
@@ -162,9 +166,25 @@ def exact_jaccard(S_rep: sp.csr_matrix, pairs: np.ndarray) -> np.ndarray:
     return out
 
 
+
 # ---------------------------------------------------------------------------
-# 4. 전체 실행과 점수
+# 4. 구조 만들기 (라벨과 무관) / 점수 매기기 (라벨 필요)
 # ---------------------------------------------------------------------------
+@dataclass
+class LSHStructure:
+    """라벨과 무관한 LSH 결과. 설정마다 한 번만 만들고 fold마다 score_lsh로 점수만 다시 매긴다."""
+
+    n: int
+    eligible: np.ndarray           # 최소 집합 크기를 넘은 host
+    group: np.ndarray              # host -> 묶음 번호 (-1 = 대상 아님)
+    reps: np.ndarray               # 묶음 대표 host
+    S_rep: sp.csr_matrix           # 대표의 들어오는 링크 집합
+    sig: np.ndarray                # MinHash signature (num_perm, 대표 수)
+    pairs: np.ndarray              # Jaccard 재확인을 통과한 대표 인덱스 쌍
+    G: sp.csr_matrix               # 묶음 사이 연결 (대칭, 0·1)
+    stats: dict = field(default_factory=dict)
+
+
 @dataclass
 class LSHResult:
     scores: np.ndarray             # 길이 N, 높을수록 스팸
@@ -191,17 +211,13 @@ def _label_vectors(n: int, spam_ids, nonspam_ids) -> tuple[np.ndarray, np.ndarra
     return is_lab, is_spam, len(spam_ids) / n_lab
 
 
-def run_lsh(A: sp.spmatrix, spam_ids, nonspam_ids, *,
-            min_set_size: int = config.MIN_SET_SIZE_DEFAULT,
-            bands_rows: tuple[int, int] = config.LSH_BANDS_DEFAULT,
-            num_perm: int = config.NUM_PERM,
-            alpha: float = config.LSH_ALPHA,
-            bucket_cap: int = config.LSH_BUCKET_CAP,
-            seed: int = config.SEED) -> LSHResult:
-    """LSH 점수 전체 계산.
-
-    spam_ids, nonspam_ids: 점수 계산에 써도 되는 라벨 (검증 땐 seed용 fold, 최종 땐 SET1).
-    """
+def build_lsh(A: sp.spmatrix, *,
+              min_set_size: int = config.MIN_SET_SIZE_DEFAULT,
+              bands_rows: tuple[int, int] = config.LSH_BANDS_DEFAULT,
+              num_perm: int = config.NUM_PERM,
+              bucket_cap: int = config.LSH_BUCKET_CAP,
+              seed: int = config.SEED) -> LSHStructure:
+    """라벨 없이 할 수 있는 부분 전부: 필터 -> 묶기 -> MinHash -> banding -> Jaccard 재확인 -> 연결."""
     if min_set_size < 1:
         raise ValueError("min_set_size는 1 이상")
     bands, rows = bands_rows
@@ -221,33 +237,15 @@ def run_lsh(A: sp.spmatrix, spam_ids, nonspam_ids, *,
     thr = jaccard_threshold(bands, rows)
     kept = band.pairs[jac >= thr]
 
-    # 묶음 사이 연결 (대칭, 0·1)
     n_rep = len(reps)
     G = sp.coo_matrix((np.ones(len(kept)), (kept[:, 0], kept[:, 1])), shape=(n_rep, n_rep)).tocsr()
     G = ((G + G.T) > 0).astype(np.float64)
 
-    # 묶음별 라벨 수 → 이웃 라벨 수 (자기 묶음 + 연결된 묶음, 자기 자신 제외)
-    is_lab, is_spam, p = _label_vectors(n, spam_ids, nonspam_ids)
-    members = np.flatnonzero(eligible)
-    g_of = group[members]
-    L = np.bincount(g_of, weights=is_lab[members], minlength=n_rep)
-    Sp = np.bincount(g_of, weights=is_spam[members], minlength=n_rep)
-    L_nb, S_nb = G @ L, G @ Sp
-
-    n_lab_nb = np.zeros(n)
-    n_spam_nb = np.zeros(n)
-    n_lab_nb[members] = L[g_of] - is_lab[members] + L_nb[g_of]
-    n_spam_nb[members] = Sp[g_of] - is_spam[members] + S_nb[g_of]
-
-    scores = (n_spam_nb + alpha * p) / (n_lab_nb + alpha)
-    covered = n_lab_nb >= 1
-
-    group_size = np.bincount(g_of, minlength=n_rep)
+    group_size = np.bincount(group[eligible], minlength=n_rep)
     skipped_hosts = int(group_size[band.skipped_reps].sum()) if len(band.skipped_reps) else 0
     stats = {
         "min_set_size": min_set_size, "bands": bands, "rows": rows, "num_perm": num_perm,
-        "alpha": alpha, "bucket_cap": bucket_cap, "seed": seed,
-        "jaccard_threshold": thr, "p": p,
+        "bucket_cap": bucket_cap, "seed": seed, "jaccard_threshold": thr,
         "eligible_hosts": int(eligible.sum()),
         "groups": n_rep,
         "hosts_in_shared_groups": int(group_size[group_size > 1].sum()),
@@ -256,26 +254,176 @@ def run_lsh(A: sp.spmatrix, spam_ids, nonspam_ids, *,
         "skipped_buckets": band.skipped_buckets,
         "skipped_groups": int(len(band.skipped_reps)),
         "skipped_hosts": skipped_hosts,
-        "covered_hosts": int(covered.sum()),
-        "seconds": round(time.perf_counter() - t0, 2),
+        "build_seconds": round(time.perf_counter() - t0, 2),
     }
-    return LSHResult(scores, covered, group, reps, kept, stats)
+    return LSHStructure(n, eligible, group, reps, S_rep, sig, kept, G, stats)
+
+
+def score_lsh(st: LSHStructure, spam_ids, nonspam_ids,
+              alpha: float = config.LSH_ALPHA) -> tuple[np.ndarray, np.ndarray, float]:
+    """이웃 라벨로 점수. 반환: (점수, 커버, p).
+
+    이웃 라벨 수 = 자기 묶음 라벨 수 − 자기 라벨 + 연결된 묶음들의 라벨 수 합.
+    """
+    is_lab, is_spam, p = _label_vectors(st.n, spam_ids, nonspam_ids)
+    n_rep = len(st.reps)
+    members = np.flatnonzero(st.eligible)
+    g_of = st.group[members]
+    L = np.bincount(g_of, weights=is_lab[members], minlength=n_rep)
+    Sp = np.bincount(g_of, weights=is_spam[members], minlength=n_rep)
+    L_nb, S_nb = st.G @ L, st.G @ Sp
+
+    n_lab_nb = np.zeros(st.n)
+    n_spam_nb = np.zeros(st.n)
+    n_lab_nb[members] = L[g_of] - is_lab[members] + L_nb[g_of]
+    n_spam_nb[members] = Sp[g_of] - is_spam[members] + S_nb[g_of]
+
+    scores = (n_spam_nb + alpha * p) / (n_lab_nb + alpha)
+    return scores, n_lab_nb >= 1, p
+
+
+def run_lsh(A: sp.spmatrix, spam_ids, nonspam_ids, *,
+            min_set_size: int = config.MIN_SET_SIZE_DEFAULT,
+            bands_rows: tuple[int, int] = config.LSH_BANDS_DEFAULT,
+            num_perm: int = config.NUM_PERM,
+            alpha: float = config.LSH_ALPHA,
+            bucket_cap: int = config.LSH_BUCKET_CAP,
+            seed: int = config.SEED) -> LSHResult:
+    """LSH 점수 전체 계산 (build_lsh + score_lsh).
+
+    spam_ids, nonspam_ids: 점수 계산에 써도 되는 라벨 (검증 땐 seed용 fold, 최종 땐 SET1).
+    """
+    t0 = time.perf_counter()
+    st = build_lsh(A, min_set_size=min_set_size, bands_rows=bands_rows, num_perm=num_perm,
+                   bucket_cap=bucket_cap, seed=seed)
+    scores, covered, p = score_lsh(st, spam_ids, nonspam_ids, alpha)
+    stats = {**st.stats, "alpha": alpha, "p": p, "covered_hosts": int(covered.sum()),
+             "seconds": round(time.perf_counter() - t0, 2)}
+    return LSHResult(scores, covered, st.group, st.reps, st.pairs, stats)
+
+
+def make_score_fn(A: sp.spmatrix, **build_kwargs):
+    """evaluate.cross_validate에 넣을 score_fn(seed_spam, seed_non). 구조는 한 번만 만든다."""
+    alpha = build_kwargs.pop("alpha", config.LSH_ALPHA)
+    st = build_lsh(A, **build_kwargs)
+
+    def score_fn(seed_spam, seed_non):
+        return score_lsh(st, seed_spam, seed_non, alpha)[0]
+
+    score_fn.structure = st
+    return score_fn
+
+
+def setting_name(min_set_size: int, bands_rows: tuple[int, int]) -> str:
+    """설정 이름 규칙. 예: lsh_min1_b16r8"""
+    return f"lsh_min{min_set_size}_b{bands_rows[0]}r{bands_rows[1]}"
 
 
 # ---------------------------------------------------------------------------
-# 실행: python -m src.lsh  — 설정별 후보 쌍 수 먼저 세기 (확정안 9절 일정 11/20)
+# 5. 근사 품질: S-curve와 recall (강의 4강 p51-57)
 # ---------------------------------------------------------------------------
-def main(argv: list[str] | None = None) -> int:
+def theoretical_curve(jac: np.ndarray, bands: int, rows: int) -> np.ndarray:
+    """두 집합의 Jaccard가 t일 때 후보가 될 확률 1 − (1 − t^r)^b (강의 4강 p54-55)."""
+    return 1.0 - (1.0 - np.asarray(jac, dtype=float) ** rows) ** bands
+
+
+def sample_pairs(S_rep: sp.csr_matrix, n_pairs: int, seed: int = config.SEED) -> np.ndarray:
+    """원소를 하나 이상 공유하는 대표 쌍을 무작위로 뽑는다 (i < j, 중복 없음).
+
+    무작위 대표 i -> i의 원소 x 하나 -> x를 가진 다른 대표 j.
+    한 쌍이 후보가 될 확률은 그 쌍의 Jaccard로만 정해지므로 (MinHash 성질, 강의 4강 p35),
+    해시 결과와 무관하게(집합 구조만 보고) 뽑은 쌍이라면 Jaccard 구간별 후보 비율로 S-curve를 잴 수 있다.
+    LSH가 찾은 쌍처럼 해시 결과를 보고 고른 쌍은 섞으면 안 된다.
+    """
+    rng = np.random.default_rng(seed)
+    n_rep = S_rep.shape[0]
+    C = S_rep.tocsc()
+    i = rng.integers(0, n_rep, size=n_pairs * 2)
+    lo, hi = S_rep.indptr[i], S_rep.indptr[i + 1]
+    x = S_rep.indices[lo + (rng.random(len(i)) * (hi - lo)).astype(np.int64)]
+    clo, chi = C.indptr[x], C.indptr[x + 1]
+    j = C.indices[clo + (rng.random(len(i)) * (chi - clo)).astype(np.int64)]
+    a, b = np.minimum(i, j), np.maximum(i, j)
+    keep = a != b
+    codes = np.unique(a[keep] * n_rep + b[keep])[:n_pairs]
+    return np.stack([codes // n_rep, codes % n_rep], axis=1)
+
+
+def shares_band(sig: np.ndarray, pairs: np.ndarray, bands: int, rows: int) -> np.ndarray:
+    """쌍이 한 band라도 signature가 같은지 (= 버킷 상한이 없을 때 후보가 되는지)."""
+    eq = sig[:, pairs[:, 0]] == sig[:, pairs[:, 1]]
+    return eq.reshape(bands, rows, -1).all(axis=1).any(axis=0)
+
+
+def scurve(st: LSHStructure, n_pairs: int = 500_000, n_bins: int = 20,
+           seed: int = config.SEED) -> tuple["pd.DataFrame", dict]:
+    """Jaccard 구간별 실제 후보 비율 vs 이론값, 그리고 recall.
+
+    표본 = 원소를 공유하는 무작위 쌍 (sample_pairs). 집합 구조만 보고 뽑으므로 해시 결과와 무관하다.
+    LSH가 이미 찾은 쌍을 표본에 섞으면 "후보가 됐기 때문에 뽑힌" 쌍이 들어가 비율이 부풀려지므로 섞지 않는다.
+    recall = 실제 Jaccard ≥ 문턱인 표본 쌍 중 최종 연결(st.pairs)에 들어간 비율 (버킷 상한 효과 포함).
+    """
+    import pandas as pd
+
+    bands, rows = st.stats["bands"], st.stats["rows"]
+    thr = st.stats["jaccard_threshold"]
+    n_rep = len(st.reps)
+    pairs = sample_pairs(st.S_rep, n_pairs, seed)
+    codes = pairs[:, 0] * n_rep + pairs[:, 1]
+
+    jac = exact_jaccard(st.S_rep, pairs)
+    cand = shares_band(st.sig, pairs, bands, rows)
+    linked_codes = np.sort(st.pairs[:, 0] * n_rep + st.pairs[:, 1])
+    pos = np.searchsorted(linked_codes, codes)
+    linked = (pos < len(linked_codes)) & (linked_codes[np.minimum(pos, len(linked_codes) - 1)] == codes)
+
+    edges = np.linspace(0, 1, n_bins + 1)
+    b = np.clip(np.digitize(jac, edges[1:-1]), 0, n_bins - 1)
+    rows_out = []
+    for k in range(n_bins):
+        m = b == k
+        if not m.any():
+            continue
+        mid = (edges[k] + edges[k + 1]) / 2
+        rows_out.append({
+            "jaccard_lo": edges[k], "jaccard_hi": edges[k + 1], "n_pairs": int(m.sum()),
+            "candidate_rate": float(cand[m].mean()),
+            "theory_mid": float(theoretical_curve(mid, bands, rows)),
+            "theory_mean": float(theoretical_curve(jac[m], bands, rows).mean()),
+        })
+    above = jac >= thr
+    summary = {
+        "setting": setting_name(st.stats["min_set_size"], (bands, rows)),
+        "jaccard_threshold": thr,
+        "n_sample_pairs": int(len(pairs)),
+        "n_above_threshold": int(above.sum()),
+        "recall_candidate": float(cand[above].mean()) if above.any() else float("nan"),
+        "recall_final": float(linked[above].mean()) if above.any() else float("nan"),
+        "false_candidate_rate_below": float(cand[~above].mean()) if (~above).any() else float("nan"),
+    }
+    return pd.DataFrame(rows_out), summary
+
+
+# ---------------------------------------------------------------------------
+# 실행
+# ---------------------------------------------------------------------------
+def _load_set1():
     from src.load_graph import load_graph, load_labels
 
-    A, _ = load_graph()
+    A, hostnames = load_graph()
     train, _ = load_labels()                       # SET1만 사용 (SET2는 절대 쓰지 않음)
-    spam = train.loc[train.label == "spam", "hostid"]
-    nonspam = train.loc[train.label == "nonspam", "hostid"]
+    spam = train.loc[train.label == "spam", "hostid"].to_numpy()
+    nonspam = train.loc[train.label == "nonspam", "hostid"].to_numpy()
+    return A, hostnames, train, spam, nonspam
+
+
+def cmd_counts() -> int:
+    """설정 15개의 후보 쌍 수·시간·커버리지 (확정안 일정 11/20)."""
+    import pandas as pd
+
+    A, _, _, spam, nonspam = _load_set1()
     labeled = np.zeros(A.shape[0], dtype=bool)
     labeled[np.concatenate([spam, nonspam])] = True
-
-    import pandas as pd
 
     cols = ["min", "b,r", "thr", "eligible", "groups", "cand_pairs", "verified",
             "skip_bkt", "skip_hosts", "covered", "cov_SET1", "sec"]
@@ -297,6 +445,70 @@ def main(argv: list[str] | None = None) -> int:
     pd.DataFrame(records).to_csv(out, index=False)
     print(f"\n저장: {out.relative_to(config.ROOT)}  (SET1 라벨만 사용, 실행 시간은 컴퓨터마다 다름)")
     return 0
+
+
+def cmd_validate() -> int:
+    """검증 5-fold PR-AUC로 (b, r)·최소 집합 크기 고르기 (확정안 4절·5절, evaluate.select_setting 규칙)."""
+    import pandas as pd
+
+    from src.evaluate import cross_validate, select_setting
+    from src.splits import load_splits
+
+    A, hostnames, train, _, _ = _load_set1()
+    folds = load_splits(config.SPLITS_PATH)
+    default = setting_name(config.MIN_SET_SIZE_DEFAULT, config.LSH_BANDS_DEFAULT)
+    cv, records = {}, []
+    for m in config.MIN_SET_SIZE_GRID:
+        for br in config.LSH_BANDS_GRID:
+            name = setting_name(m, br)
+            fn = make_score_fn(A, min_set_size=m, bands_rows=br)
+            cv[name] = cross_validate(fn, folds, train, hostnames)
+            r = cv[name]
+            records.append({"setting": name, "min_set_size": m, "bands": br[0], "rows": br[1],
+                            **{k: r[k] for k in r if k.endswith(("_mean", "_std"))},
+                            "build_seconds": fn.structure.stats["build_seconds"]})
+            print(f"{name:>16s}  PR-AUC {r['pr_auc_mean']:.3f} ± {r['pr_auc_std']:.3f}  "
+                  f"ROC {r['roc_auc_mean']:.3f}  P@100 {r['p@100_mean']:.3f}", flush=True)
+    sel = select_setting(cv, default=default)
+    out = config.TABLES_DIR / "lsh_validation.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(records).assign(chosen=lambda d: d.setting == sel["chosen"]).to_csv(out, index=False)
+    print(f"\n선택: {sel['chosen']}  ({sel['reason']}, 최고 {sel['best']}, 차이 {sel['gap']:.3f}, "
+          f"최고 설정 표준편차 {sel['best_std']:.3f})")
+    print(f"저장: {out.relative_to(config.ROOT)}  (검증 fold만 사용, SET2 안 봄)")
+    return 0
+
+
+def cmd_scurve() -> int:
+    """설정 3개(b, r)의 S-curve와 recall (최소 집합 크기는 기본값)."""
+    import pandas as pd
+
+    from src import figures
+
+    A, _, _, _, _ = _load_set1()
+    curves, summaries = [], []
+    for br in config.LSH_BANDS_GRID:
+        st = build_lsh(A, min_set_size=config.MIN_SET_SIZE_DEFAULT, bands_rows=br)
+        df, summ = scurve(st)
+        curves.append(df.assign(bands=br[0], rows=br[1]))
+        summaries.append(summ)
+        print(f"{summ['setting']:>16s}  문턱 {summ['jaccard_threshold']:.2f}  "
+              f"후보 recall {summ['recall_candidate']:.3f}  최종 recall {summ['recall_final']:.3f}  "
+              f"문턱 아래 후보 비율 {summ['false_candidate_rate_below']:.3f}", flush=True)
+    curve_df = pd.concat(curves, ignore_index=True)
+    config.TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    curve_df.to_csv(config.TABLES_DIR / "lsh_scurve.csv", index=False)
+    pd.DataFrame(summaries).to_csv(config.TABLES_DIR / "lsh_scurve_summary.csv", index=False)
+    fig = figures.fig_lsh_scurve(curve_df)
+    print(f"\n저장: results/tables/lsh_scurve.csv, lsh_scurve_summary.csv, {fig.relative_to(config.ROOT)}")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="python -m src.lsh", description="MinHash/LSH 분석 (SET1 라벨만 사용)")
+    ap.add_argument("command", nargs="?", default="counts", choices=["counts", "validate", "scurve"])
+    args = ap.parse_args(argv)
+    return {"counts": cmd_counts, "validate": cmd_validate, "scurve": cmd_scurve}[args.command]()
 
 
 if __name__ == "__main__":
