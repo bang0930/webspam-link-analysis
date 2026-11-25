@@ -325,7 +325,7 @@ def make_figures(ctx, scores, tables) -> list[Path]:
         F.fig_final_table(tables["table"], float(ctx.target.y.mean()), out_dir,
                           name=f"{prefix}fig_final_pr_auc", title=title),
         F.fig_pr_curves(seed_scores, ctx.target, families=fams, out_dir=out_dir,
-                        name=f"{prefix}fig_pr_curves", title=title),
+                        name=f"{prefix}fig_pr_curves", title=title, y_max=0.5),
     ]
 
 

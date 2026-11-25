@@ -145,7 +145,7 @@ def fig_final_table(table, base_rate: float, out_dir: Path | None = None,
         ax.scatter(row["pr_auc"], i, s=40, color=color, edgecolor="white", linewidth=1.5, zorder=3)
         ax.text(hi + 0.004, i, f"{row['pr_auc']:.3f}", va="center", fontsize=7.5, color="#2d3748")
     ax.axvline(base_rate, color="#4a5568", ls="--", lw=1)
-    ax.text(base_rate, len(df) - 0.4, f" random = {base_rate:.3f}", fontsize=7.5, color="#4a5568", va="bottom")
+    ax.text(base_rate, len(df) - 0.4, f" spam share = {base_rate:.3f}", fontsize=7.5, color="#4a5568", va="bottom")
     ax.set_yticks(range(len(df)))
     ax.set_yticklabels([METHOD_NAMES.get(k, k) for k in df["key"]], fontsize=8)
     ax.set_xlabel("PR-AUC (average precision), 95% domain-bootstrap CI")
@@ -165,11 +165,12 @@ PR_CURVE_KEYS = ("tr_set1_trust", "ppr", "lsh", "pagerank", "in_degree")
 
 def fig_pr_curves(scores: dict, target, keys=PR_CURVE_KEYS, families: dict | None = None,
                   out_dir: Path | None = None, name: str = "fig_pr_curves",
-                  title: str | None = None) -> Path:
+                  title: str | None = None, y_max: float | None = None) -> Path:
     """PR 곡선: 대표 방법들의 precision-recall 곡선 + 무작위 기준선.
 
     scores: {방법 키: 길이 N 점수} (높을수록 스팸). target: evaluate.EvalTarget (채점 대상).
     families: {방법 키: 묶음} (색). 선 모양도 방법마다 달리해 색만으로 구분하지 않는다.
+    y_max: 세로축 위쪽 끝. 신호가 약해 곡선이 바닥에 붙을 때 확대용 (재현율 0 근처 튀는 값은 잘림).
     """
     from sklearn.metrics import average_precision_score, precision_recall_curve
 
@@ -184,10 +185,9 @@ def fig_pr_curves(scores: dict, target, keys=PR_CURVE_KEYS, families: dict | Non
         ax.step(r, p, where="post", color=FAMILY_COLORS.get(fam, FAMILY_COLORS["baseline"]), ls=ls, lw=1.6,
                 label=f"{METHOD_NAMES.get(k, k)} (AP {ap:.3f})")
     base = float(target.y.mean())
-    ax.axhline(base, color="#4a5568", ls="--", lw=1)
-    ax.text(0.01, base + 0.01, f"random = {base:.3f}", fontsize=7.5, color="#4a5568", ha="left", va="bottom")
+    ax.axhline(base, color="#4a5568", ls="--", lw=1, label=f"spam share = random ({base:.3f})")
     ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1.02)
+    ax.set_ylim(0, y_max if y_max else 1.02)
     ax.set_xlabel("recall")
     ax.set_ylabel("precision")
     ax.grid(alpha=0.3)
