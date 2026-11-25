@@ -155,6 +155,14 @@ SET1/SET2는 3단계 도메인 기준으로 무작위 분할되어 있으며 겹
 
 Baseline: 무작위, in-degree, out-degree, 1단계 이웃 스팸 비율(두 방향)
 
+LSH 설정별 후보 쌍 수·커버리지 확인 (SET1 라벨만 사용, 약 1.5분, 메모리 최대 약 3.3GB):
+
+```bash
+python -m src.lsh
+```
+
+결과는 `results/tables/lsh_candidate_counts.csv`에 저장됩니다.
+
 PageRank·TrustRank·PPR은 같은 수식 계열(teleport만 다른 PageRank)이며, 하나의 공통 엔진을 공유합니다.
 
 ## Running experiments
