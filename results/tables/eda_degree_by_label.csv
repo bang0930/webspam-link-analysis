@@ -1,0 +1,5 @@
+label,degree,n_hosts,mean,median,p90,zero_rate
+nonspam,in,3776,16.84,6.0,27.0,0.03
+nonspam,out,3776,13.28,1.0,21.0,0.395
+spam,in,222,7.78,4.0,16.0,0.09
+spam,out,222,80.77,0.0,18.900000000000006,0.563

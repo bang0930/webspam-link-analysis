@@ -53,8 +53,9 @@ webspam-link-analysis/
 │   ├── ppr.py
 │   ├── lsh.py                 # MinHash, LSH
 │   ├── baselines.py
-│   ├── evaluate.py            # 지표, bootstrap 신뢰구간
-│   └── figures.py             # 보고서 그림
+│   ├── evaluate.py            # 지표, bootstrap 신뢰구간, 검증 5-fold
+│   ├── eda.py                 # 데이터 통계표, degree, 판정자 일치도, 링크 가정 확인
+│   └── figures.py             # 보고서 그림 (전부 여기서 생성)
 ├── experiments/               # 🚧
 │   ├── run_main.py            # 점수 → 채점 → 표 → 그림
 │   └── run_sensitivity.py     # 분석 곡선
@@ -134,6 +135,14 @@ SET1/SET2는 3단계 도메인 기준으로 무작위 분할되어 있으며 겹
 | 나가는 링크가 없는 host (dangling) | 49,379 (43.1%) |
 | 라벨된 스팸 중 나가는 링크가 없는 host | 189 / 344 (55%) |
 
+### 데이터 탐색 (EDA)
+
+```bash
+python -m src.eda
+```
+
+데이터 통계표, 스팸·정상의 degree 요약(SET1), 판정자 간 일치도(SET1·SET2), TrustRank·PPR 가정 확인(SET1 라벨 host 사이의 링크)을 `results/tables/eda_*.csv`에, degree 분포 그림을 `results/figures/fig_degree_distribution.png`에 저장합니다. 방법 설계에 영향을 줄 수 있는 분석은 SET1만 사용합니다.
+
 ## Preprocessing
 
 - undecided 라벨 제외
@@ -141,7 +150,7 @@ SET1/SET2는 3단계 도메인 기준으로 무작위 분할되어 있으며 겹
 - 도메인(3단계 도메인) 단위로 SET1을 5-fold로 나눔 → `splits.json`
 - 채점 대상 = SET2 라벨 − undecided − 신뢰 도메인 host → `eval_set.json`
 - 두 파일에는 hostid와 fold 번호만 저장하고, 라벨은 실행할 때 원본에서 읽음 (라벨 재배포 방지)
-- 🚧 최종 채점 대상 host 수·스팸 수
+- 최종 채점 대상: 1,921개 host (스팸 121개). SET2 스팸 중 1개는 신뢰 도메인이라 빠짐
 
 ## Algorithms
 
@@ -155,13 +164,13 @@ SET1/SET2는 3단계 도메인 기준으로 무작위 분할되어 있으며 겹
 
 Baseline: 무작위, in-degree, out-degree, 1단계 이웃 스팸 비율(두 방향)
 
-LSH 설정별 후보 쌍 수·커버리지 확인 (SET1 라벨만 사용, 약 1.5분, 메모리 최대 약 3.3GB):
+LSH 분석 (모두 SET1 라벨만 사용, SET2는 읽지 않음):
 
-```bash
-python -m src.lsh
-```
-
-결과는 `results/tables/lsh_candidate_counts.csv`에 저장됩니다.
+| 명령 | 내용 | 결과 | 시간·메모리 (참고) |
+|---|---|---|---|
+| `python -m src.lsh` | 설정 15개의 후보 쌍 수·커버리지 | `results/tables/lsh_candidate_counts.csv` | 약 1.5분, 최대 약 3.3GB |
+| `python -m src.lsh validate` | 검증 5-fold PR-AUC로 (b, r)·최소 집합 크기 선택 | `results/tables/lsh_validation.csv` | 약 1.5분 |
+| `python -m src.lsh scurve` | S-curve(이론 vs 실제)와 recall | `results/tables/lsh_scurve*.csv`, `results/figures/fig_lsh_scurve.png` | 약 30초, 최대 약 4.4GB |
 
 PageRank·TrustRank·PPR은 같은 수식 계열(teleport만 다른 PageRank)이며, 하나의 공통 엔진을 공유합니다.
 

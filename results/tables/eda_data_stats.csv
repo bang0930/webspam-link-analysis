@@ -1,0 +1,16 @@
+항목,값
+host 수,114529
+"방향 있는 edge 수 (0·1, 자기 자신 링크 제외)",1836441
+평균 out-degree,16.03
+dangling host (나가는 링크 0),49379
+들어오는 링크 0,4766
+완전히 고립된 host,3380
+신뢰 도메인 host,8877
+SET1 nonspam,3776
+SET1 spam,222
+SET1 undecided,277
+SET2 nonspam,1933
+SET2 spam,122
+SET2 undecided,149
+채점 대상 eval_set host,1921
+채점 대상 eval_set 스팸,121
