@@ -35,6 +35,7 @@ from src.results_io import src_dirty                     # noqa: E402
 def _run_main():
     spec = importlib.util.spec_from_file_location("run_main", ROOT / "experiments" / "run_main.py")
     mod = importlib.util.module_from_spec(spec)
+    sys.modules["run_main"] = mod          # dataclass가 모듈을 찾을 수 있게 먼저 등록
     spec.loader.exec_module(mod)
     return mod
 
