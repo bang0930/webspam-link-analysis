@@ -92,5 +92,107 @@ def fig_lsh_scurve(curve_df, out_dir: Path | None = None) -> Path:
 
 # ---------------------------------------------------------------------------
 # 박병언: seed·damping 곡선, PageRank vs TrustRank 구간별 그림 (작성 예정)
-# 강민수: 최종 비교표, PR 곡선 (작성 예정)
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 강민수: 최종 비교표, PR 곡선
+# ---------------------------------------------------------------------------
+# 방법 묶음별 색 (분류용 색 순서 고정, 무작위 순환 안 함). baseline은 회색으로 물러나게.
+FAMILY_COLORS = {"trustrank": "#257de0", "ppr": "#f47230", "lsh": "#00b894",
+                 "pagerank": "#f2a600", "baseline": "#718096"}
+FAMILY_ORDER = ("trustrank", "ppr", "lsh", "pagerank", "baseline")
+
+# 그림 글자는 영어 (run_main 방법 키 -> 그림용 이름)
+METHOD_NAMES = {
+    "pagerank": "PageRank (reference)",
+    "tr_set1_trust": "TrustRank · SET1 seeds · trust",
+    "tr_set1_mass": "TrustRank · SET1 seeds · spam mass",
+    "tr_domain_trust": "TrustRank · trusted-domain seeds · trust",
+    "tr_domain_mass": "TrustRank · trusted-domain seeds · spam mass",
+    "ppr": "PPR · spam seeds",
+    "lsh": "MinHash/LSH",
+    "random": "Baseline · random",
+    "in_degree": "Baseline · in-degree",
+    "out_degree": "Baseline · out-degree",
+    "one_hop_in": "Baseline · 1-hop (in-links)",
+    "one_hop_out": "Baseline · 1-hop (out-links)",
+}
+
+
+def _parse_ci(ci) -> tuple[float, float]:
+    """run_main 표의 "[0.081, 0.142]" 문자열 또는 (lo, hi)."""
+    if isinstance(ci, str):
+        lo, hi = ci.strip("[] ").split(",")
+        return float(lo), float(hi)
+    return float(ci[0]), float(ci[1])
+
+
+def fig_final_table(table, base_rate: float, out_dir: Path | None = None,
+                    name: str = "fig_final_pr_auc", title: str | None = None) -> Path:
+    """최종 비교표 그림: 방법별 PR-AUC (점) + 95% 신뢰구간 (가로 막대), 무작위 기준선 (점선).
+
+    table: run_main score_table() 결과 (key, family, pr_auc, pr_auc_ci95 열).
+    base_rate: 채점 대상의 스팸 비율 = 무작위로 줄 세웠을 때 PR-AUC 기댓값.
+    위에서부터 PR-AUC 높은 순. 색은 방법 묶음, 범례로 묶음 이름을 같이 적는다.
+    """
+    df = table.sort_values("pr_auc", ascending=True).reset_index(drop=True)
+    fig, ax = plt.subplots(figsize=(6.4, 0.34 * len(df) + 1.3))
+    for i, row in df.iterrows():
+        lo, hi = _parse_ci(row["pr_auc_ci95"])
+        color = FAMILY_COLORS.get(row["family"], FAMILY_COLORS["baseline"])
+        ax.plot([lo, hi], [i, i], color=color, lw=2, solid_capstyle="round")
+        ax.scatter(row["pr_auc"], i, s=40, color=color, edgecolor="white", linewidth=1.5, zorder=3)
+        ax.text(hi + 0.004, i, f"{row['pr_auc']:.3f}", va="center", fontsize=7.5, color="#2d3748")
+    ax.axvline(base_rate, color="#4a5568", ls="--", lw=1)
+    ax.text(base_rate, len(df) - 0.4, f" random = {base_rate:.3f}", fontsize=7.5, color="#4a5568", va="bottom")
+    ax.set_yticks(range(len(df)))
+    ax.set_yticklabels([METHOD_NAMES.get(k, k) for k in df["key"]], fontsize=8)
+    ax.set_xlabel("PR-AUC (average precision), 95% domain-bootstrap CI")
+    ax.set_ylim(-0.6, len(df) - 0.1)
+    ax.grid(axis="x", alpha=0.3)
+    ax.spines[["top", "right"]].set_visible(False)
+    handles = [plt.Line2D([], [], color=FAMILY_COLORS[f], marker="o", lw=2, label=f)
+               for f in FAMILY_ORDER if f in set(df["family"])]
+    ax.legend(handles=handles, fontsize=7.5, loc="lower right", frameon=False)
+    if title:
+        ax.set_title(title, fontsize=9.5)
+    return savefig(fig, name, out_dir)
+
+
+PR_CURVE_KEYS = ("tr_set1_trust", "ppr", "lsh", "pagerank", "in_degree")
+
+
+def fig_pr_curves(scores: dict, target, keys=PR_CURVE_KEYS, families: dict | None = None,
+                  out_dir: Path | None = None, name: str = "fig_pr_curves",
+                  title: str | None = None) -> Path:
+    """PR 곡선: 대표 방법들의 precision-recall 곡선 + 무작위 기준선.
+
+    scores: {방법 키: 길이 N 점수} (높을수록 스팸). target: evaluate.EvalTarget (채점 대상).
+    families: {방법 키: 묶음} (색). 선 모양도 방법마다 달리해 색만으로 구분하지 않는다.
+    """
+    from sklearn.metrics import average_precision_score, precision_recall_curve
+
+    families = families or {}
+    styles = ("-", "--", "-.", ":", (0, (5, 1, 1, 1)))
+    fig, ax = plt.subplots(figsize=(5.4, 3.9))
+    for k, ls in zip(keys, styles):
+        s = np.asarray(scores[k], dtype=float)[target.hostid]
+        p, r, _ = precision_recall_curve(target.y, s)
+        ap = average_precision_score(target.y, s)
+        fam = families.get(k, k if k in FAMILY_COLORS else "baseline")
+        ax.step(r, p, where="post", color=FAMILY_COLORS.get(fam, FAMILY_COLORS["baseline"]), ls=ls, lw=1.6,
+                label=f"{METHOD_NAMES.get(k, k)} (AP {ap:.3f})")
+    base = float(target.y.mean())
+    ax.axhline(base, color="#4a5568", ls="--", lw=1)
+    ax.text(0.01, base + 0.01, f"random = {base:.3f}", fontsize=7.5, color="#4a5568", ha="left", va="bottom")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("recall")
+    ax.set_ylabel("precision")
+    ax.grid(alpha=0.3)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.legend(fontsize=7, loc="upper right", frameon=False)
+    if title:
+        ax.set_title(title, fontsize=9.5)
+    return savefig(fig, name, out_dir)
