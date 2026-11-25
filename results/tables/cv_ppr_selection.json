@@ -1,0 +1,31 @@
+{
+ "chosen": "ppr_forward_raw",
+ "best": "ppr_reverse_raw",
+ "default": "ppr_forward_raw",
+ "gap": 0.023666062776823746,
+ "best_std": 0.024491657835579866,
+ "reason": "기본값 유지 (차이 < fold 간 표준편차)",
+ "table": {
+  "ppr_forward_raw": {
+   "pr_auc_mean": 0.07823381607435302,
+   "pr_auc_std": 0.014120796457272222
+  },
+  "ppr_forward_ratio": {
+   "pr_auc_mean": 0.09650994321057564,
+   "pr_auc_std": 0.016389389142447225
+  },
+  "ppr_reverse_raw": {
+   "pr_auc_mean": 0.10189987885117677,
+   "pr_auc_std": 0.024491657835579866
+  },
+  "ppr_reverse_ratio": {
+   "pr_auc_mean": 0.09411092014012806,
+   "pr_auc_std": 0.03071808767707153
+  }
+ },
+ "damping": 0.85,
+ "created": "2026-11-25T18:58:00",
+ "src_hash": "86ecd3effea26f7ac8b313aa7f70e9b8edef5bf3",
+ "commit": "19250468482f7d2503421e66dc17ef73b55affc6",
+ "dirty": false
+}
