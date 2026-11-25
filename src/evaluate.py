@@ -212,3 +212,69 @@ def evaluate_ranking(rank_scores: np.ndarray, target: EvalTarget, n_buckets: int
         {"bucket": b + 1, "n_hosts": sizes[b], "spam_rate": float(base[b]), "ci95": _ci(bs[:, b])}
         for b in range(n_buckets)
     ]
+
+
+# ---------------------------------------------------------------------------
+# 검증 (11/24 중간 점검): SET1 5-fold 평균으로 세부 값 고르기
+# ---------------------------------------------------------------------------
+# score_fn(seed_spam_ids, seed_nonspam_ids) -> 길이 N 점수 배열 (높을수록 스팸)
+# 검증 땐 seed용 4개 fold 라벨만 score_fn에 넘긴다. 검증 fold 라벨은 채점에만 쓴다.
+ScoreFn = Callable[[np.ndarray, np.ndarray], np.ndarray]
+
+
+def cross_validate(score_fn: ScoreFn, folds, train, hostnames: Sequence[str],
+                   ks: Sequence[int] = KS) -> dict:
+    """방법 하나를 5개 fold에 돌려 fold별 지표와 평균 ± 표준편차를 낸다.
+
+    folds: splits.load_splits() 결과 (hostid, fold)
+    train: load_labels()의 SET1 표 (hostid, label). undecided는 무시된다.
+    hostnames: hostid -> 이름 (도메인·신뢰 도메인 판별용)
+    채점 대상 = 검증 fold - 신뢰 도메인 (최종 채점 규칙과 같음). bootstrap은 하지 않는다 (속도).
+    """
+    from src import splits as S  # 순환 import 방지
+
+    label_of = dict(zip(train["hostid"].astype(int), train["label"]))
+    per_fold = []
+    for k in sorted(set(int(f) for f in folds["fold"])):
+        seed_ids, _ = S.fold_hosts(folds, k)
+        seed_spam = np.array([i for i in seed_ids if label_of[int(i)] == "spam"], dtype=int)
+        seed_non = np.array([i for i in seed_ids if label_of[int(i)] == "nonspam"], dtype=int)
+        scores = score_fn(seed_spam, seed_non)
+        tgt = EvalTarget.build(S.validation_eval_ids(folds, k, hostnames), label_of,
+                               lambda i: S.domain_of(hostnames[i]))
+        m = metrics(_check_scores(scores, tgt), tgt.y, ks)
+        m.update(fold=k, n_hosts=tgt.n, n_spam=tgt.n_spam)
+        per_fold.append(m)
+    out = {"per_fold": per_fold}
+    for key in ["pr_auc", "roc_auc"] + [f"p@{k}" for k in ks]:
+        v = np.array([f[key] for f in per_fold], dtype=float)
+        out[f"{key}_mean"] = float(np.nanmean(v))
+        out[f"{key}_std"] = float(np.nanstd(v, ddof=1)) if np.isfinite(v).sum() > 1 else float("nan")
+    return out
+
+
+def select_setting(cv: dict[str, dict], default: str, metric: str = "pr_auc") -> dict:
+    """확정안 4절 규칙으로 설정 하나를 고른다.
+
+    cv: {설정 이름: cross_validate 결과}
+    가장 높은 평균을 낸 설정과 기본값의 차이가 그 설정의 fold 간 표준편차보다 작으면 기본값을 유지한다.
+    """
+    if default not in cv:
+        raise ValueError(f"기본값 {default!r}이 후보에 없음")
+    best = max(cv, key=lambda name: cv[name][f"{metric}_mean"])
+    gap = cv[best][f"{metric}_mean"] - cv[default][f"{metric}_mean"]
+    std = cv[best][f"{metric}_std"]
+    keep_default = best == default or not (gap >= std)
+    chosen = default if keep_default else best
+    return {
+        "chosen": chosen,
+        "best": best,
+        "default": default,
+        "gap": float(gap),
+        "best_std": float(std),
+        "reason": ("기본값 유지 (차이 < fold 간 표준편차)" if keep_default and best != default
+                   else "기본값이 최고" if best == default
+                   else "차이 ≥ fold 간 표준편차 → 최고 설정 선택"),
+        "table": {name: {f"{metric}_mean": r[f"{metric}_mean"], f"{metric}_std": r[f"{metric}_std"]}
+                  for name, r in cv.items()},
+    }
