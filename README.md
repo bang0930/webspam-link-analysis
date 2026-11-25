@@ -27,7 +27,7 @@ SCE331 Data Mining Team Project
 | 박병언 | 🚧 | 공통 엔진, PageRank, TrustRank, Spam Mass, seed 실험 |
 | 강민수 | 🚧 | 데이터 분할, 채점, PPR, 최종 비교표, error analysis |
 
-팀 번호: 🚧
+팀 번호: G06
 
 ## Repository layout
 
@@ -55,9 +55,10 @@ webspam-link-analysis/
 │   ├── baselines.py
 │   ├── evaluate.py            # 지표, bootstrap 신뢰구간, 검증 5-fold
 │   ├── eda.py                 # 데이터 통계표, degree, 판정자 일치도, 링크 가정 확인
+│   ├── results_io.py          # 점수 저장·불러오기 (설정 json, src 해시, dirty)
 │   └── figures.py             # 보고서 그림 (전부 여기서 생성)
-├── experiments/               # 🚧
-│   ├── run_main.py            # 점수 → 채점 → 표 → 그림
+├── experiments/
+│   ├── run_main.py            # 최종 설정 → 점수 → 채점 → 표 (check / --final)
 │   └── run_sensitivity.py     # 분석 곡선
 ├── tests/                     # pytest (합성 데이터 + 실제 데이터 통계 대조)
 ├── notebooks/                 # EDA·확인용 (보고서 그림은 만들지 않음)
@@ -176,17 +177,25 @@ PageRank·TrustRank·PPR은 같은 수식 계열(teleport만 다른 PageRank)이
 
 ## Running experiments
 
-🚧 코드 완성 후 확정
-
 ```bash
 python scripts/download_data.py          # 1. 데이터 받기
-python experiments/run_main.py           # 2. 점수 → 채점 → 표 → 그림
-python experiments/run_sensitivity.py    # 3. 분석 곡선 (damping, seed 개수)
+python -m src.eda                        # 2. 데이터 통계·그림
+python experiments/run_main.py --final --force   # 3. 최종 설정으로 점수 → SET2 채점 → 표 (→ 그림)
+python experiments/run_sensitivity.py    # 4. 🚧 분석 곡선 (damping, seed 개수)
 ```
 
-- 랜덤 seed: 42 (반복 실험은 42–46)
-- 계산 결과는 `results/scores/`에 캐시되며, `--force`로 다시 계산합니다.
-- 최종 결과는 커밋을 모두 마친 상태에서 `--force`로 실행한 결과입니다.
+`experiments/run_main.py` 모드
+
+| 명령 | seed 라벨 | 채점 대상 | 결과 |
+|---|---|---|---|
+| `python experiments/run_main.py` (check) | SET1 fold 1~4 | SET1 fold 0 − 신뢰 도메인 | `results/check/` (깃에 안 올림, 시험용) |
+| `python experiments/run_main.py --final` | SET1 전체 | `eval_set.json` (SET2) | `results/tables/final_*.csv` |
+
+- 최종 설정(검증으로 고른 값과 근거)은 `experiments/run_main.py` 맨 위 `FINAL`에 모아 둡니다.
+- `--final`은 설정이 모두 확정된 뒤 한 번만 실행합니다. `src/`에 커밋 안 한 수정이 있으면 실행하지 않습니다.
+- 점수는 `results/scores/<모드>/`에 `.npy`와 `.json`(설정, 날짜, 실행 시간, `src/` 해시, dirty 여부)으로 저장되고, `src/` 코드가 바뀌면 자동으로 다시 계산합니다. `--force`로 전부 다시 계산합니다.
+- 랜덤 seed: 42 (무작위 baseline·LSH 해시는 42–46 다섯 번 반복해 평균 ± 표준편차)
+- 실행 시간 약 3분, 메모리 최대 약 2.8GB (LSH 5회가 대부분)
 
 ## Evaluation
 
