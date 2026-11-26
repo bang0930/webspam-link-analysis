@@ -71,7 +71,8 @@ def main(argv=None) -> int:
 
     pd.set_option("display.width", 200)
     print(f"[{mode}] 채점 대상 {ctx.target.n}개 (스팸 {ctx.target.n_spam}), 상위 {args.k}개 기준, "
-          f"방법 {len(df.attrs['keys'])}개, 오탐 기준 {df.attrs['false_alarm_min']}개 이상")
+          f"방법 {len(df.attrs['keys'])}개, 계열 {len(df.attrs['families'])}개, "
+          f"오탐 기준 계열 {df.attrs['false_alarm_min']}개 이상")
     print("\n## 그룹별 특징\n" + tables["error_summary"].round(3).to_string(index=False))
     print("\n## 방법별\n" + tables["error_per_method"].to_string(index=False))
     print("\n## 사례\n" + tables["error_cases"].round(3).to_string(index=False))

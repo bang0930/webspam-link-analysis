@@ -16,3 +16,7 @@ venv/
 
 # OS
 .DS_Store
+
+# 최종 error analysis 사례·host 표는 SET2 hostname 목록이라 깃에 올리지 않음
+results/tables/final_error_cases.csv
+results/tables/final_error_hosts.csv
