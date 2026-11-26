@@ -1,0 +1,14 @@
+group,suffix,n,share
+missed_spam,co.uk,80,0.9639
+missed_spam,org.uk,2,0.0241
+missed_spam,ltd.uk,1,0.0120
+caught_spam,co.uk,36,0.9474
+caught_spam,org.uk,2,0.0526
+false_alarm,co.uk,8,1.0000
+other_nonspam,co.uk,1497,0.8354
+other_nonspam,org.uk,282,0.1574
+other_nonspam,ltd.uk,6,0.0033
+other_nonspam,me.uk,4,0.0022
+other_nonspam,co.uk:7070,1,0.0006
+other_nonspam,co.uk:8081,1,0.0006
+other_nonspam,net.uk,1,0.0006

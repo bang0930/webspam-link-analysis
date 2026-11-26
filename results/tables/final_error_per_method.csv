@@ -1,0 +1,8 @@
+method,spam_caught,nonspam_flagged,spam_only_this
+pagerank,9,91,0
+tr_set1_trust,9,91,0
+tr_set1_mass,9,91,0
+tr_domain_trust,8,92,0
+tr_domain_mass,8,92,0
+ppr,14,86,13
+lsh,16,84,15
