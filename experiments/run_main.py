@@ -314,7 +314,19 @@ def subsets(ctx, ms, scores) -> pd.DataFrame:
 #   강민수: 최종 비교표, PR 곡선 (scores와 ctx.target 사용)
 # ---------------------------------------------------------------------------
 def make_figures(ctx, scores, tables) -> list[Path]:
-    return []
+    from src import figures as F
+
+    out_dir = config.FIGURES_DIR if ctx.mode == "final" else ctx.out_dir / "figures"
+    prefix = "" if ctx.mode == "final" else "check_"
+    fams = {m.key: m.family for m in methods()}
+    seed_scores = {k: v[config.SEED] for k, v in scores.items()}
+    title = None if ctx.mode == "final" else "CHECK MODE (SET1 fold 0) - not report numbers"
+    return [
+        F.fig_final_table(tables["table"], float(ctx.target.y.mean()), out_dir,
+                          name=f"{prefix}fig_final_pr_auc", title=title),
+        F.fig_pr_curves(seed_scores, ctx.target, families=fams, out_dir=out_dir,
+                        name=f"{prefix}fig_pr_curves", title=title, y_max=0.5),
+    ]
 
 
 # ---------------------------------------------------------------------------
