@@ -90,6 +90,42 @@ def fig_lsh_scurve(curve_df, out_dir: Path | None = None) -> Path:
     return savefig(fig, "fig_lsh_scurve", out_dir)
 
 
+CAUGHT_LABELS = {
+    "tr_set1_trust": "TrustRank\n(SET1 seeds)",
+    "tr_domain_mass": "TrustRank\n(trusted domains,\nSpam Mass)",
+    "ppr": "PPR\n(spam seeds)",
+    "lsh": "MinHash/LSH",
+    "in_degree": "in-degree\n(baseline)",
+}
+
+
+def fig_caught_overlap(caught_df, out_dir: Path | None = None,
+                       name: str = "fig_caught_overlap", title: str | None = None) -> Path:
+    """H3: 방법별로 상위 100개 안에 잡은 스팸 수와, 그중 그 방법만 잡은 수 (run_main.caught 표)."""
+    d = caught_df[caught_df["with"].fillna("") == ""]
+    d = d[d["method"].isin(CAUGHT_LABELS)]
+    union = caught_df.loc[caught_df["method"] == "합집합", "caught"]
+    x = np.arange(len(d))
+    fig, ax = plt.subplots(figsize=(6.4, 3.6))
+    ax.bar(x, d["caught"], color="#a0aec0", label="caught in top 100")
+    ax.bar(x, d["only_this"].astype(float), color="#2b6cb0", label="caught only by this method")
+    for xi, (c, o) in enumerate(zip(d["caught"], d["only_this"].astype(int))):
+        ax.text(xi, c + 0.3, f"{c} ({o})", ha="center", va="bottom", fontsize=8)
+    ax.set_xticks(x, [CAUGHT_LABELS[m] for m in d["method"]], fontsize=8)
+    ax.set_ylabel("spam hosts")
+    extra_title = title
+    title = "Spam caught in each method's top 100"
+    if len(union):
+        title += f"  (union = {int(union.iloc[0])})"
+    if extra_title:
+        title = f"{extra_title}\n{title}"
+    ax.set_title(title, fontsize=10)
+    ax.set_ylim(0, max(d["caught"].max() * 1.45, 1))
+    ax.grid(alpha=0.3, axis="y")
+    ax.legend(fontsize=8, loc="upper left")
+    return savefig(fig, name, out_dir)
+
+
 # ---------------------------------------------------------------------------
 # 박병언: seed·damping 곡선, PageRank vs TrustRank 구간별 그림 (작성 예정)
 # ---------------------------------------------------------------------------

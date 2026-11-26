@@ -10,6 +10,8 @@
         seed 라벨 = SET1 전체, 채점 대상 = eval_set.json (SET2 − undecided − 신뢰 도메인).
         src/에 커밋 안 한 수정이 있으면 실행하지 않는다. 결과는 results/tables/final_*.csv.
     --force: 저장된 점수를 무시하고 전부 다시 계산 (최종 채점과 12/4 재현 테스트에서는 꼭 쓴다).
+    --analysis: SET1만 쓰는 분석(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선)도 먼저 실행한다.
+        보고서의 모든 표·그림을 한 번에 재현할 때: python experiments/run_main.py --final --force --analysis
 
 만드는 표 (확정안 6절)
     *_table.csv        최종 비교표 (방법별 PR-AUC·ROC-AUC·P@50·P@100, 95% 신뢰구간, 5회 반복 표준편차)
@@ -310,8 +312,10 @@ def subsets(ctx, ms, scores) -> pd.DataFrame:
 
 # ---------------------------------------------------------------------------
 # 그림: 결과를 만든 사람이 src/figures.py에 함수를 추가하고 여기서 부른다 (확정안 13절)
+#   김현중: 잡은 스팸 겹침 (caught 표, H3)
 #   박병언: 구간별 스팸 비율(ranking 표), seed·damping 곡선(run_sensitivity.py)
 #   강민수: 최종 비교표, PR 곡선 (scores와 ctx.target 사용)
+# check 모드 그림은 results/check/에, final 그림은 results/figures/에 저장한다.
 # ---------------------------------------------------------------------------
 def make_figures(ctx, scores, tables) -> list[Path]:
     from src import figures as F
@@ -326,7 +330,54 @@ def make_figures(ctx, scores, tables) -> list[Path]:
                           name=f"{prefix}fig_final_pr_auc", title=title),
         F.fig_pr_curves(seed_scores, ctx.target, families=fams, out_dir=out_dir,
                         name=f"{prefix}fig_pr_curves", title=title, y_max=0.5),
+        F.fig_caught_overlap(tables["caught"], out_dir, name=f"{prefix}fig_caught_overlap", title=title),
     ]
+
+
+# ---------------------------------------------------------------------------
+# 분석 단계 (--analysis): SET1만 쓰는 표·그림. 모드와 무관하게 results/tables, results/figures에 저장.
+# 새 분석 스크립트가 생기면 여기에 한 줄 추가한다.
+# ---------------------------------------------------------------------------
+def _script_main(path: Path):
+    """experiments/*.py의 main(argv)를 불러온다. 파일이 아직 없으면 None."""
+    import importlib.util
+
+    if not path.exists():
+        return None
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[path.stem] = mod
+    spec.loader.exec_module(mod)
+    return mod.main
+
+
+def analysis_steps() -> list[tuple[str, object]]:
+    from src import eda
+
+    steps = [
+        ("EDA: 데이터 통계·degree·판정자 일치도·가정 확인", lambda: eda.main([])),
+        ("LSH: 설정별 후보 쌍 수", lambda: LSH.main(["counts"])),
+        ("LSH: 검증 5-fold로 설정 선택", lambda: LSH.main(["validate"])),
+        ("LSH: S-curve와 recall", lambda: LSH.main(["scurve"])),
+    ]
+    for title, script in (("PPR: 검증 5-fold로 설정 선택", "cv_ppr.py"),
+                          ("곡선: damping·seed 개수", "run_sensitivity.py")):
+        fn = _script_main(ROOT / "experiments" / script)
+        if fn is not None:
+            steps.append((title, lambda fn=fn: fn([])))
+        else:
+            print(f"[skip] {title} ({script} 아직 없음)")
+    return steps
+
+
+def run_analysis(steps=None) -> None:
+    for title, fn in (steps if steps is not None else analysis_steps()):
+        t0 = time.perf_counter()
+        print(f"\n===== {title} =====", flush=True)
+        code = fn()
+        if code not in (0, None):
+            raise SystemExit(f"[err] '{title}' 단계가 실패했습니다 (종료 코드 {code})")
+        print(f"----- {title}: {time.perf_counter() - t0:.0f}s", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -334,6 +385,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="최종 설정으로 전체 실행")
     ap.add_argument("--final", action="store_true", help="SET2로 최종 채점 (설정 확정 후 한 번만)")
     ap.add_argument("--force", action="store_true", help="저장된 점수를 무시하고 다시 계산")
+    ap.add_argument("--analysis", action="store_true", help="SET1 분석(EDA, LSH, PPR 검증, 곡선)도 먼저 실행")
     args = ap.parse_args(argv)
     mode = "final" if args.final else "check"
 
@@ -342,6 +394,9 @@ def main(argv=None) -> int:
         return 1
 
     t0 = time.perf_counter()
+    if args.analysis:
+        run_analysis()
+        print("\n===== 최종 설정으로 점수 → 채점 → 표 =====", flush=True)
     ctx = build_context(mode)
     print(f"[{mode}] seed 라벨: 스팸 {len(ctx.seed_spam)} / 정상 {len(ctx.seed_non)}, "
           f"채점 대상: {ctx.target.n}개 (스팸 {ctx.target.n_spam})")
