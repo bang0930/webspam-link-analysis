@@ -10,8 +10,10 @@
         seed 라벨 = SET1 전체, 채점 대상 = eval_set.json (SET2 − undecided − 신뢰 도메인).
         src/에 커밋 안 한 수정이 있으면 실행하지 않는다. 결과는 results/tables/final_*.csv.
     --force: 저장된 점수를 무시하고 전부 다시 계산 (최종 채점과 12/4 재현 테스트에서는 꼭 쓴다).
-    --analysis: SET1만 쓰는 분석(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선)도 먼저 실행한다.
+    --analysis: 분석 단계(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선)도 먼저 실행한다.
         보고서의 모든 표·그림을 한 번에 재현할 때: python experiments/run_main.py --final --force --analysis
+        시험할 때는 빼고 돌린다 (분석 표는 깃에 올라간 results/tables/에 다시 저장되기 때문).
+    표·그림 다음에 error analysis(experiments/error_analysis.py)를 같은 모드로 이어서 실행한다.
 
 만드는 표 (확정안 6절)
     *_table.csv        최종 비교표 (방법별 PR-AUC·ROC-AUC·P@50·P@100, 95% 신뢰구간, 5회 반복 표준편차)
@@ -335,7 +337,9 @@ def make_figures(ctx, scores, tables) -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# 분석 단계 (--analysis): SET1만 쓰는 표·그림. 모드와 무관하게 results/tables, results/figures에 저장.
+# 분석 단계 (--analysis): 결과는 모드와 무관하게 results/tables, results/figures에 저장.
+# EDA·LSH·PPR 검증은 SET1만 쓴다. 곡선(run_sensitivity.py)은 검증 줄과 SET2 줄을 그리므로(확정안 6절)
+# 최종 모드에서만 --final을 넘긴다 → check 모드에서는 SET2를 건드리지 않아야 한다.
 # 새 분석 스크립트가 생기면 여기에 한 줄 추가한다.
 # ---------------------------------------------------------------------------
 def _script_main(path: Path):
@@ -351,27 +355,28 @@ def _script_main(path: Path):
     return mod.main
 
 
-def analysis_steps() -> list[tuple[str, object]]:
+def analysis_steps(mode: str = "check") -> list[tuple[str, object]]:
     from src import eda
 
+    final_args = ["--final"] if mode == "final" else []
     steps = [
         ("EDA: 데이터 통계·degree·판정자 일치도·가정 확인", lambda: eda.main([])),
         ("LSH: 설정별 후보 쌍 수", lambda: LSH.main(["counts"])),
         ("LSH: 검증 5-fold로 설정 선택", lambda: LSH.main(["validate"])),
         ("LSH: S-curve와 recall", lambda: LSH.main(["scurve"])),
     ]
-    for title, script in (("PPR: 검증 5-fold로 설정 선택", "cv_ppr.py"),
-                          ("곡선: damping·seed 개수", "run_sensitivity.py")):
+    for title, script, argv in (("PPR: 검증 5-fold로 설정 선택", "cv_ppr.py", []),
+                                ("곡선: damping·seed 개수", "run_sensitivity.py", final_args)):
         fn = _script_main(ROOT / "experiments" / script)
         if fn is not None:
-            steps.append((title, lambda fn=fn: fn([])))
+            steps.append((title, lambda fn=fn, argv=argv: fn(argv)))
         else:
             print(f"[skip] {title} ({script} 아직 없음)")
     return steps
 
 
-def run_analysis(steps=None) -> None:
-    for title, fn in (steps if steps is not None else analysis_steps()):
+def run_analysis(steps=None, mode: str = "check") -> None:
+    for title, fn in (steps if steps is not None else analysis_steps(mode)):
         t0 = time.perf_counter()
         print(f"\n===== {title} =====", flush=True)
         code = fn()
@@ -380,12 +385,18 @@ def run_analysis(steps=None) -> None:
         print(f"----- {title}: {time.perf_counter() - t0:.0f}s", flush=True)
 
 
+def error_analysis_step(mode: str):
+    """표·그림 다음 단계: experiments/error_analysis.py를 같은 모드로 (방금 저장한 점수 캐시를 씀)."""
+    fn = _script_main(ROOT / "experiments" / "error_analysis.py")
+    return lambda: fn(["--final"] if mode == "final" else [])
+
+
 # ---------------------------------------------------------------------------
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="최종 설정으로 전체 실행")
     ap.add_argument("--final", action="store_true", help="SET2로 최종 채점 (설정 확정 후 한 번만)")
     ap.add_argument("--force", action="store_true", help="저장된 점수를 무시하고 다시 계산")
-    ap.add_argument("--analysis", action="store_true", help="SET1 분석(EDA, LSH, PPR 검증, 곡선)도 먼저 실행")
+    ap.add_argument("--analysis", action="store_true", help="분석 단계(EDA, LSH, PPR 검증, 곡선)도 먼저 실행")
     args = ap.parse_args(argv)
     mode = "final" if args.final else "check"
 
@@ -395,7 +406,7 @@ def main(argv=None) -> int:
 
     t0 = time.perf_counter()
     if args.analysis:
-        run_analysis()
+        run_analysis(mode=mode)
         print("\n===== 최종 설정으로 점수 → 채점 → 표 =====", flush=True)
     ctx = build_context(mode)
     print(f"[{mode}] seed 라벨: 스팸 {len(ctx.seed_spam)} / 정상 {len(ctx.seed_non)}, "
@@ -424,6 +435,7 @@ def main(argv=None) -> int:
     state = git_state()
     print(f"\n저장: {ctx.out_dir.relative_to(ROOT)}/{prefix}*.csv, 그림 {len(figs)}개 | "
           f"commit {str(state['commit'])[:7]} dirty={state['dirty']} | {time.perf_counter() - t0:.0f}s")
+    run_analysis([("error analysis: 놓친 스팸·오탐 정상", error_analysis_step(mode))])
     if mode == "check":
         print("※ check 모드: SET1 fold 0으로 채점한 시험 결과입니다. 보고서 숫자가 아닙니다.")
     return 0

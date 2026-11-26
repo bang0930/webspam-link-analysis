@@ -147,3 +147,11 @@ def test_figures_and_analysis_steps(tmp_path, monkeypatch):
         rm.run_analysis([("bad", lambda: 1)])
     titles = [t for t, _ in rm.analysis_steps()]
     assert titles[0].startswith("EDA") and any("PPR" in t for t in titles)
+
+    seen = []                                                # 곡선 스크립트에는 최종 모드에서만 --final
+    monkeypatch.setattr(rm, "_script_main", lambda path: (lambda argv: seen.append((path.name, argv))))
+    for mode in ("check", "final"):
+        dict(rm.analysis_steps(mode))["곡선: damping·seed 개수"]()
+        rm.error_analysis_step(mode)()
+    assert seen == [("run_sensitivity.py", []), ("error_analysis.py", []),
+                    ("run_sensitivity.py", ["--final"]), ("error_analysis.py", ["--final"])]

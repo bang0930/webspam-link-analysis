@@ -186,7 +186,11 @@ python scripts/download_data.py
 python experiments/run_main.py --final --force --analysis
 ```
 
-`--analysis`는 SET1만 쓰는 분석(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선)을 먼저 실행하고, 이어서 최종 설정으로 점수 → SET2 채점 → 표 → 그림을 만듭니다. 분석 단계만 따로 돌리려면 `python -m src.eda`, `python -m src.lsh [counts|validate|scurve]`, `python experiments/cv_ppr.py`를 쓰면 됩니다.
+순서: `--analysis` 분석 단계(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선) → 최종 설정으로 점수 → SET2 채점 → 표 → 그림 → error analysis.
+
+- 분석 단계 중 EDA·LSH·PPR 검증은 SET1만 씁니다. 곡선은 검증 결과와 SET2 결과를 두 줄로 그리므로 `--final`일 때만 SET2를 씁니다.
+- 분석 단계만 따로 돌리려면 `python -m src.eda`, `python -m src.lsh [counts|validate|scurve]`, `python experiments/cv_ppr.py`를 쓰면 됩니다.
+- 시험할 때는 `--analysis` 없이 `python experiments/run_main.py`만 돌립니다. 분석 표는 모드와 상관없이 깃에 올라간 `results/tables/`에 다시 저장되기 때문입니다.
 
 `experiments/run_main.py` 모드
 
@@ -221,9 +225,13 @@ python experiments/run_main.py --final --force --analysis
 | LSH 검증 설정 선택 | `results/tables/lsh_validation.csv` | 분석 (`python -m src.lsh validate`) |
 | LSH S-curve·recall 표와 그림 | `results/tables/lsh_scurve*.csv`, `results/figures/fig_lsh_scurve.png` | 분석 (`python -m src.lsh scurve`) |
 | PPR 검증 설정 선택 | `results/tables/cv_ppr.csv`, `cv_ppr_selection.json` | 분석 (`python experiments/cv_ppr.py`) |
-| 최종 비교표, 핵심 비교, 구간별 스팸 비율, 잡은 스팸, 하위 집합 | `results/tables/final_*.csv` | 최종 (`--final`) |
+| 최종 비교표, 핵심 비교, 구간별 스팸 비율, 잡은 스팸, 하위 집합 | `results/tables/final_{table,comparisons,ranking,caught,subsets}.csv` | 최종 (`--final`) |
+| 최종 비교표 그림 | `results/figures/fig_final_pr_auc.png` | 최종 (`--final`) |
+| PR 곡선 | `results/figures/fig_pr_curves.png` | 최종 (`--final`) |
 | 잡은 스팸 겹침 그림 (H3) | `results/figures/fig_caught_overlap.png` | 최종 (`--final`) |
-| 🚧 PR 곡선, 구간별 그림 | `results/figures/` | 최종 (`--final`) |
+| error analysis (그룹별 특징, 방법별, 주소 끝) | `results/tables/final_error_{summary,per_method,suffix}.csv` | 최종 (`python experiments/error_analysis.py --final`) |
+| error analysis 사례표 | `results/tables/final_error_cases.csv` (SET2 hostname이라 깃에 안 올림) | 최종 (같은 명령) |
+| 🚧 PageRank vs TrustRank 구간별 그림 | `results/figures/` | 최종 (`--final`) |
 | 🚧 seed 개수 곡선, damping 곡선 | `results/figures/` | 분석 (`run_sensitivity.py`) |
 
 ## Results
