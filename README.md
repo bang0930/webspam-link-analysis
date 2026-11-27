@@ -96,7 +96,8 @@ pip install -r requirements.txt
 
 ### 기록된 실험 환경
 
-2026-11-27 기록 기준으로 macOS 26.7.3, Apple M4, 물리 코어 10개, 논리 코어 10개, 메모리 24 GiB, Python 3.13.3을 사용했습니다.
+2026-11-28 기록(commit 88330c5에서 최종 재현 명령 4개를 처음부터 다시 실행) 기준으로 macOS 26.6.2, Apple M4, 물리 코어 10개, 논리 코어 10개, 메모리 24 GiB, Python 3.12.10을 사용했습니다.
+이때 `run_main.py --final --force --analysis`는 약 10.5분·최대 메모리 약 4.7GB, `tie_check.py --final --force`는 약 30초, `run_combine.py --final --force`는 약 3분이 걸렸습니다.
 numpy 2.5.5, scipy 1.18.1, pandas 3.1.1, scikit-learn 1.9.1, networkx 3.7, matplotlib 3.11.2는 requirements.txt의 고정 버전과 일치합니다.
 자세한 기록은 `results/tables/environment.csv`에 있습니다.
 
@@ -308,7 +309,7 @@ TrustRank 0점 host와 SET1 정상 seed에서 도달 불가능한 host는 전체
 
 ## References and external code
 
-IEEE 형식 초안과 인용 위치는 [docs/REFERENCES.md](docs/REFERENCES.md)에 있습니다. 강의 11 표지의 강의자는 Sael Lee, 이슬로 확인되며, 참고문헌의 미확인 표기는 제출 전에 정리합니다.
+IEEE 형식 참고문헌과 인용 위치는 [docs/REFERENCES.md](docs/REFERENCES.md)에 있습니다.
 
 - WEBSPAM-UK2007 dataset, Yahoo! Research Barcelona (Web Spam Challenge 2008)
 - PageRank (Page, Brin, Motwani, Winograd, 1999)
@@ -318,7 +319,6 @@ IEEE 형식 초안과 인용 위치는 [docs/REFERENCES.md](docs/REFERENCES.md)�
 - Anti-TrustRank (Krishnan, Raj, 2006)
 - MinHash (Broder, 1997)
 - J. Leskovec, A. Rajaraman, J. Ullman, *Mining of Massive Datasets*
-- SCE331 강의 자료 4강(LSH), 11강(Link Analysis)
 
 외부 라이브러리: numpy, scipy, pandas, scikit-learn(분할·평가 지표), networkx(PageRank 검증), matplotlib, pytest — 버전은 `requirements.txt`에 고정
 
