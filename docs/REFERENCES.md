@@ -2,10 +2,6 @@
 
 보고서 References 섹션과 README "References and external code"에 쓰는 목록입니다. 담당: 강민수.
 
-- 서지 정보는 2026-11-26에 원문 쪽(학회·저널 페이지, DBLP, 각 소프트웨어의 공식 인용 안내)에서 하나씩 확인했습니다.
-- IEEE는 **본문에 처음 나오는 순서**로 번호를 매깁니다. 아래 번호는 보고서 구성(Intro → Data → Methods → 구현) 순서로 미리 매긴 것이라, 보고서가 확정되면 순서를 다시 맞춥니다.
-- `[교수님 성함]`처럼 대괄호로 표시한 칸은 아직 확인하지 못한 정보입니다. 지어내지 말고 확인해서 채웁니다.
-
 ## 목록
 
 [1] L. Page, S. Brin, R. Motwani, and T. Winograd, "The PageRank citation ranking: Bringing order to the Web," Stanford InfoLab, Stanford, CA, USA, Tech. Rep. 1999-66, 1999. [Online]. Available: http://ilpubs.stanford.edu:8090/422/
@@ -62,8 +58,3 @@
 | [11] | 같은 데이터 계열에서 링크 기반 스팸 탐지 선행연구 | 1. Introduction (선행연구) |
 | [12], [13] | 교재, 강의 자료 (알고리즘 정의·강의 슬라이드 근거) | 3. Methods |
 | [14]–[19] | 사용 소프트웨어 (버전은 requirements.txt) | 3. Methods 또는 4. Experimental design (실행 환경) |
-
-## 남은 확인
-
-- [13] 강의 자료의 정확한 강의 제목과 교수님 성함
-- 데이터 라이선스: README에는 CC BY-NC-SA 3.0으로 되어 있음. 배포처 페이지에는 라벨이 연구 목적용이라는 안내와 별도 라이선스 페이지 링크가 있으니, 보고서 Data 섹션에 쓸 때 라이선스 페이지 문구로 한 번 더 확인
