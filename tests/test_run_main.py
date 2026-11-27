@@ -125,3 +125,33 @@ def test_final_refuses_dirty(monkeypatch, capsys):
     monkeypatch.setattr(rm, "src_dirty", lambda: True)
     assert rm.main(["--final"]) == 1
     assert "커밋 안 한 수정" in capsys.readouterr().out
+
+
+def test_figures_and_analysis_steps(tmp_path, monkeypatch):
+    monkeypatch.setattr(R, "git_state", lambda: {"commit": "c0", "src_hash": "abc", "dirty": False})
+    monkeypatch.setattr(R, "src_hash", lambda: "abc")
+    rm = _load_run_main()
+    ctx = _synthetic_ctx(rm, tmp_path)
+    ms = rm.methods()
+    scores = rm.compute_scores(ctx, ms, root=tmp_path / "scores")
+    boot = rm.bootstrap_indices(ctx.target)
+    tables = {"table": rm.score_table(ctx, ms, scores, boot), "caught": rm.caught(ctx, scores)}
+    paths = rm.make_figures(ctx, scores, tables)            # check 모드 → ctx.out_dir/figures에 check_ 이름으로
+    assert len(paths) == 3
+    assert all(p.exists() and p.parent == ctx.out_dir / "figures" and p.name.startswith("check_") for p in paths)
+
+    calls = []
+    rm.run_analysis([("a", lambda: calls.append("a") or 0), ("b", lambda: calls.append("b"))])
+    assert calls == ["a", "b"]
+    with pytest.raises(SystemExit):                          # 실패한 단계가 있으면 멈춤
+        rm.run_analysis([("bad", lambda: 1)])
+    titles = [t for t, _ in rm.analysis_steps()]
+    assert titles[0].startswith("EDA") and any("PPR" in t for t in titles)
+
+    seen = []                                                # 곡선 스크립트에는 최종 모드에서만 --final
+    monkeypatch.setattr(rm, "_script_main", lambda path: (lambda argv: seen.append((path.name, argv))))
+    for mode in ("check", "final"):
+        dict(rm.analysis_steps(mode))["곡선: damping·seed 개수"]()
+        rm.error_analysis_step(mode)()
+    assert seen == [("run_sensitivity.py", []), ("error_analysis.py", []),
+                    ("run_sensitivity.py", ["--final"]), ("error_analysis.py", ["--final"])]

@@ -177,12 +177,20 @@ PageRank·TrustRank·PPR은 같은 수식 계열(teleport만 다른 PageRank)이
 
 ## Running experiments
 
+보고서의 모든 표·그림을 처음부터 재현하는 명령 (약 7분, 메모리 최대 약 4.7GB):
+
 ```bash
-python scripts/download_data.py          # 1. 데이터 받기
-python -m src.eda                        # 2. 데이터 통계·그림
-python experiments/run_main.py --final --force   # 3. 최종 설정으로 점수 → SET2 채점 → 표 (→ 그림)
-python experiments/run_sensitivity.py    # 4. 🚧 분석 곡선 (damping, seed 개수)
+python scripts/download_data.py
 ```
+```bash
+python experiments/run_main.py --final --force --analysis
+```
+
+순서: `--analysis` 분석 단계(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선) → 최종 설정으로 점수 → SET2 채점 → 표 → 그림 → error analysis.
+
+- 분석 단계 중 EDA·LSH·PPR 검증은 SET1만 씁니다. 곡선은 검증 결과와 SET2 결과를 두 줄로 그리므로 `--final`일 때만 SET2를 씁니다.
+- 분석 단계만 따로 돌리려면 `python -m src.eda`, `python -m src.lsh [counts|validate|scurve]`, `python experiments/cv_ppr.py`를 쓰면 됩니다.
+- 시험할 때는 `--analysis` 없이 `python experiments/run_main.py`만 돌립니다. 분석 표는 모드와 상관없이 깃에 올라간 `results/tables/`에 다시 저장되기 때문입니다.
 
 `experiments/run_main.py` 모드
 
@@ -207,16 +215,24 @@ python experiments/run_sensitivity.py    # 4. 🚧 분석 곡선 (damping, seed 
 
 ## Reproducing tables and figures
 
-🚧 결과 생성 후 작성
+모두 `python experiments/run_main.py --final --force --analysis` 한 번으로 만들어집니다. 괄호는 그 부분만 따로 돌리는 명령입니다.
 
-| 결과 | 파일 | 만드는 명령 |
+| 결과 | 파일 | 단계 |
 |---|---|---|
-| 데이터 통계표 | `results/tables/` | `run_main.py` |
-| 최종 비교표 | `results/tables/` | `run_main.py` |
-| PageRank vs TrustRank 구간별 스팸 비율 | `results/figures/` | `run_main.py` |
-| PR 곡선 | `results/figures/` | `run_main.py` |
-| seed 개수 곡선 | `results/figures/` | `run_sensitivity.py` |
-| damping 곡선 | `results/figures/` | `run_sensitivity.py` |
+| 데이터 통계표, degree 요약, 판정자 일치도, 링크 가정 확인 | `results/tables/eda_*.csv` | 분석 (`python -m src.eda`) |
+| degree 분포 그림 | `results/figures/fig_degree_distribution.png` | 분석 (`python -m src.eda`) |
+| LSH 설정별 후보 쌍 수 | `results/tables/lsh_candidate_counts.csv` | 분석 (`python -m src.lsh`) |
+| LSH 검증 설정 선택 | `results/tables/lsh_validation.csv` | 분석 (`python -m src.lsh validate`) |
+| LSH S-curve·recall 표와 그림 | `results/tables/lsh_scurve*.csv`, `results/figures/fig_lsh_scurve.png` | 분석 (`python -m src.lsh scurve`) |
+| PPR 검증 설정 선택 | `results/tables/cv_ppr.csv`, `cv_ppr_selection.json` | 분석 (`python experiments/cv_ppr.py`) |
+| 최종 비교표, 핵심 비교, 구간별 스팸 비율, 잡은 스팸, 하위 집합 | `results/tables/final_{table,comparisons,ranking,caught,subsets}.csv` | 최종 (`--final`) |
+| 최종 비교표 그림 | `results/figures/fig_final_pr_auc.png` | 최종 (`--final`) |
+| PR 곡선 | `results/figures/fig_pr_curves.png` | 최종 (`--final`) |
+| 잡은 스팸 겹침 그림 (H3) | `results/figures/fig_caught_overlap.png` | 최종 (`--final`) |
+| error analysis (그룹별 특징, 방법별, 주소 끝) | `results/tables/final_error_{summary,per_method,suffix}.csv` | 최종 (`python experiments/error_analysis.py --final`) |
+| error analysis 사례표 | `results/tables/final_error_cases.csv` (SET2 hostname이라 깃에 안 올림) | 최종 (같은 명령) |
+| 🚧 PageRank vs TrustRank 구간별 그림 | `results/figures/` | 최종 (`--final`) |
+| 🚧 seed 개수 곡선, damping 곡선 | `results/figures/` | 분석 (`run_sensitivity.py`) |
 
 ## Results
 
