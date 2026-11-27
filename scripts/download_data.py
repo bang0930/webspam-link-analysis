@@ -1,4 +1,4 @@
-"""WEBSPAM-UK2007 원본 데이터 다운로드 스크립트.
+"""WEBSPAM-UK2007 원본 데이터 다운로드 스크립트. 담당: 김현중 (팀 작성 코드).
 
 공식 배포처(https://chato.cl/webspam/datasets/uk2007/)에서 host 그래프, host 이름,
 spam/nonspam 라벨(set1, set2)을 받아 data/raw/ 에 저장하고 라벨 압축을 푼다.
