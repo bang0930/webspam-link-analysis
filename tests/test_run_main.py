@@ -155,3 +155,40 @@ def test_figures_and_analysis_steps(tmp_path, monkeypatch):
         rm.error_analysis_step(mode)()
     assert seen == [("run_sensitivity.py", []), ("error_analysis.py", []),
                     ("run_sensitivity.py", ["--final"]), ("error_analysis.py", ["--final"])]
+
+
+@pytest.mark.parametrize('mode', ['check', 'final'])
+@pytest.mark.parametrize('force', [False, True])
+def test_analysis_forwards_force_only_to_sensitivity(monkeypatch, mode, force):
+    """민감도 단계에만 force를 전달하고 final은 최종 모드에서만 전달한다. 확정안 10절."""
+    rm = _load_run_main()
+    calls = []
+    monkeypatch.setattr(rm, '_script_main',
+                        lambda path: lambda argv: calls.append((path.name, list(argv))))
+    rm.run_analysis(mode=mode, force=force,
+                    steps=[step for step in rm.analysis_steps(mode, force)
+                           if step[0].startswith(('PPR:', '곡선:'))])
+    expected = (['--final'] if mode == 'final' else []) + (['--force'] if force else [])
+    assert calls == [('cv_ppr.py', []), ('run_sensitivity.py', expected)]
+
+
+@pytest.mark.parametrize('mode', ['check', 'final'])
+def test_main_passes_force_to_analysis(monkeypatch, mode):
+    """최상위 CLI의 force가 분석 실행기까지 전달되는지 확인한다. 확정안 10절."""
+    rm = _load_run_main()
+    seen = []
+
+    class AnalysisReached(Exception):
+        """실제 데이터 로드 전에 분석 분기를 확인하기 위한 종료 신호."""
+
+    def analysis(**kwargs):
+        """호출 인자를 기록하고 실제 분석 실행을 막는다."""
+        seen.append(kwargs)
+        raise AnalysisReached
+
+    monkeypatch.setattr(rm, 'src_dirty', lambda: False)
+    monkeypatch.setattr(rm, 'run_analysis', analysis)
+    args = ['--analysis', '--force'] + (['--final'] if mode == 'final' else [])
+    with pytest.raises(AnalysisReached):
+        rm.main(args)
+    assert seen == [{'mode': mode, 'force': True}]

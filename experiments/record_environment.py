@@ -2,6 +2,8 @@
 
 실행 환경 기록, 확정안 10절, 13절. 강의 11강 p36-40 (희소행렬 실행 환경).
 새 라이브러리 없이 macOS sysctl과 Linux /proc을 사용한다.
+seconds는 점수 캐시 콜백 시간이다. reported_algorithm_seconds는 알고리즘이 보고한 시간이며,
+TrustRank에서는 신뢰 전파 반복만 포함한다. 두 값 모두 통제된 단독 실행 벤치마크와 구분한다.
 """
 from __future__ import annotations
 import argparse
@@ -59,6 +61,19 @@ def hardware():
     return model or platform.processor(), os.cpu_count(), physical, memory
 
 
+def score_timing(record):
+    """캐시 콜백 시간과 알고리즘 보고 시간을 분리하고 측정 범위를 기록한다. 확정안 10절."""
+    info = record.get('info', {})
+    reported = info.get('seconds')
+    scope = ''
+    if reported is not None:
+        scope = ('trustrank_iteration_only' if info.get('method') == 'trustrank'
+                 else 'method_reported_see_settings')
+    return dict(seconds=record.get('seconds'), seconds_scope='score_cache_callback',
+                reported_algorithm_seconds=reported, reported_algorithm_seconds_scope=scope,
+                timing_note='Shared work may be charged to another row; not a standalone runtime benchmark.')
+
+
 def environment_rows(score_dir=None):
     """환경과 모든 모드의 점수 메타데이터를 읽어 긴 형태의 표로 만든다."""
     state = git_state()
@@ -89,7 +104,7 @@ def environment_rows(score_dir=None):
         name = record.get('name', path.stem)
         seen.add(re.sub(r'_s\d+$', '', name))
         add('score', name, mode=record.get('mode', ''), metadata_path=str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path),
-            seconds=record.get('seconds'), n_iter=info.get('n_iter'),
+            **score_timing(record), n_iter=info.get('n_iter'),
             n_iter_pagerank=info.get('n_iter_pagerank'), score_commit=record.get('commit'),
             score_dirty=record.get('dirty'), score_saved_at=record.get('saved_at'), status='available',
             settings=json.dumps(info, ensure_ascii=False, sort_keys=True))

@@ -20,8 +20,10 @@
 - 탐지 점수 ② spam_mass_score(): 1 − TR/PR. TR과 PR 모두 dangling "uniform", 같은 그래프 A.
   상수배는 순위에 무관하므로 스케일 보정은 하지 않고, 값 자체(예: 50%)는 해석하지 않는다.
   근거:
-    dangling = "uniform"이면 엔진 해는 r(v) = (1 − β)(I − βPᵀ)⁻¹ v 로 teleport v에 대해 선형이다
-    (src/engine.py). 균등 teleport u = 1/N을 seed 집합 S 몫과 나머지로 나누면
+    dangling = "uniform"에서 u = 1/N, q = dangling 표시 벡터, Q = Pᵀ + u qᵀ라고 두면
+    엔진 해는 r(v) = (1 − β)(I − βQ)⁻¹ v 이다. P는 dangling 행이 0인 행 정규화 행렬이다.
+    Q가 v와 무관하므로 정규화된 teleport v에 대해 선형이다 (src/engine.py).
+    균등 teleport u = 1/N을 seed 집합 S 몫과 나머지로 나누면
     u = (|S|/N) v_S + (나머지)이므로, 강의 p80의 r⁺ (teleport 질량을 S에만 1/N씩 둔 PageRank)는
     r⁺ = (|S|/N) × TR 이다 (TR = v_S로 teleport한 합 1 TrustRank). p75의 "within a scaling factor"가
     바로 이 |S|/N이다. 따라서 강의의 Spam Mass = 1 − (|S|/N) TR/PR 와 여기 값 1 − TR/PR 는

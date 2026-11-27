@@ -50,7 +50,9 @@
   topic-specific PageRank라서 같은 엔진을 쓴다 (확정안 3절).
 
 선형성 (Spam Mass가 기대는 성질, 11강 p80)
-- dangling="uniform"이면 d가 v와 무관하므로 해는 r(v) = (1 − β)(I − βPᵀ)⁻¹ v 이고 v에 대해 선형이다.
+- dangling="uniform"에서 u = 1/N, q = dangling 표시 벡터라고 두면 Q = Pᵀ + u qᵀ이다.
+  P는 dangling 행이 0인 행 정규화 행렬이고, u qᵀ가 dangling 질량을 균등하게 재분배한다.
+  β < 1에서 해는 r(v) = (1 − β)(I − βQ)⁻¹ v 이므로 정규화된 v에 대해 선형이다.
   예: 합 1인 v1, v2에 대해 r((v1 + v2) / 2) = (r(v1) + r(v2)) / 2.
   그래서 TR과 PR을 둘 다 "uniform"으로 계산해야 Spam Mass = 1 − TR/PR 의 뜻이 맞는다.
 - dangling="teleport"면 d = v라서 전이 행렬 자체가 v에 따라 바뀌고, 일반적으로 선형이 아니다.

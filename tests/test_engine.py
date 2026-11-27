@@ -112,21 +112,25 @@ def test_lecture_p46_converged_s0():
     assert r == pytest.approx([0.294, 0.118, 0.327, 0.261], abs=5e-4)
 
 
-# 슬라이드 오른쪽 표: 소수 둘째 자리에서 버림한 값. "표기 값 이상, 표기 값 + 0.01 미만"으로 검사.
+# 강의 11강 p46 오른쪽 표의 원문 값이다. 소수 표기가 일관된 반올림이나 버림은 아니다.
+# 계산 정확도는 독립적인 닫힌 해로 검증하고, 원문 표는 각 성분 오차 0.01 미만으로 대조한다.
 P46_TABLE = [
     ({0, 1, 2, 3}, 0.8, [0.13, 0.10, 0.39, 0.36]),
     ({0, 1, 2}, 0.8, [0.17, 0.13, 0.38, 0.30]),
     ({0, 1}, 0.8, [0.26, 0.20, 0.29, 0.23]),
-    ({0}, 0.9, [0.16, 0.07, 0.39, 0.35]),
-    ({0}, 0.7, [0.39, 0.13, 0.27, 0.19]),
+    ({0}, 0.9, [0.17, 0.07, 0.40, 0.36]),
+    ({0}, 0.7, [0.39, 0.14, 0.27, 0.19]),
 ]
 
 
 @pytest.mark.parametrize("S, beta, shown", P46_TABLE, ids=[f"S{sorted(s)}_b{b}" for s, b, _ in P46_TABLE])
 def test_lecture_p46_table(S, beta, shown):
+    """강의 원문 표와 계산으로 얻은 기대값을 구분해 검증한다. 강의 11강 p46."""
     r, _ = power_iteration(TOPIC, _teleport_set(S), damping=beta)
+    exact = _closed_form(TOPIC, _teleport_set(S), beta, "teleport")
+    assert r == pytest.approx(exact, abs=1e-8)
     shown = np.array(shown)
-    assert (r >= shown - 1e-12).all() and (r < shown + 0.01).all(), f"실제 값 {np.round(r, 4)}"
+    assert np.abs(exact - shown).max() < 0.01, f"원문 표 {shown}, 닫힌 해 {exact}"
 
 
 # ---------------------------------------------------------------------------

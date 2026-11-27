@@ -11,7 +11,8 @@
         src/에 커밋 안 한 수정이 있으면 실행하지 않는다. 결과는 results/tables/final_*.csv.
     --force: 저장된 점수를 무시하고 전부 다시 계산 (최종 채점과 12/4 재현 테스트에서는 꼭 쓴다).
     --analysis: 분석 단계(EDA, LSH 후보 쌍·검증·S-curve, PPR 검증, 곡선)도 먼저 실행한다.
-        보고서의 모든 표·그림을 한 번에 재현할 때: python experiments/run_main.py --final --force --analysis
+        기본 비교표와 분석 곡선 재현: python experiments/run_main.py --final --force --analysis
+        동률 진단, 순위 결합, 환경 기록은 각 실행 스크립트로 별도 재현한다.
         시험할 때는 빼고 돌린다 (분석 표는 깃에 올라간 results/tables/에 다시 저장되기 때문).
     표·그림 다음에 error analysis(experiments/error_analysis.py)를 같은 모드로 이어서 실행한다.
 
@@ -356,10 +357,12 @@ def _script_main(path: Path):
     return mod.main
 
 
-def analysis_steps(mode: str = "check") -> list[tuple[str, object]]:
+def analysis_steps(mode: str = "check", force: bool = False) -> list[tuple[str, object]]:
+    """분석 단계를 구성하고 캐시를 쓰는 민감도 단계에 force를 전달한다. 확정안 10절."""
     from src import eda
 
     final_args = ["--final"] if mode == "final" else []
+    sensitivity_args = final_args + (["--force"] if force else [])
     steps = [
         ("EDA: 데이터 통계·degree·판정자 일치도·가정 확인", lambda: eda.main([])),
         ("LSH: 설정별 후보 쌍 수", lambda: LSH.main(["counts"])),
@@ -367,7 +370,7 @@ def analysis_steps(mode: str = "check") -> list[tuple[str, object]]:
         ("LSH: S-curve와 recall", lambda: LSH.main(["scurve"])),
     ]
     for title, script, argv in (("PPR: 검증 5-fold로 설정 선택", "cv_ppr.py", []),
-                                ("곡선: damping·seed 개수", "run_sensitivity.py", final_args)):
+                                ("곡선: damping·seed 개수", "run_sensitivity.py", sensitivity_args)):
         fn = _script_main(ROOT / "experiments" / script)
         if fn is not None:
             steps.append((title, lambda fn=fn, argv=argv: fn(argv)))
@@ -376,8 +379,8 @@ def analysis_steps(mode: str = "check") -> list[tuple[str, object]]:
     return steps
 
 
-def run_analysis(steps=None, mode: str = "check") -> None:
-    for title, fn in (steps if steps is not None else analysis_steps(mode)):
+def run_analysis(steps=None, mode: str = "check", force: bool = False) -> None:
+    for title, fn in (steps if steps is not None else analysis_steps(mode, force)):
         t0 = time.perf_counter()
         print(f"\n===== {title} =====", flush=True)
         code = fn()
@@ -407,7 +410,7 @@ def main(argv=None) -> int:
 
     t0 = time.perf_counter()
     if args.analysis:
-        run_analysis(mode=mode)
+        run_analysis(mode=mode, force=args.force)
         print("\n===== 최종 설정으로 점수 → 채점 → 표 =====", flush=True)
     ctx = build_context(mode)
     print(f"[{mode}] seed 라벨: 스팸 {len(ctx.seed_spam)} / 정상 {len(ctx.seed_non)}, "
