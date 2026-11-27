@@ -1,0 +1,17 @@
+method,with,caught,only_this
+tr_set1_trust,,9,1.0
+tr_domain_mass,,8,0.0
+ppr,,14,13.0
+lsh,,16,15.0
+in_degree,,8,1.0
+tr_set1_trust,tr_domain_mass,8,
+tr_set1_trust,ppr,0,
+tr_set1_trust,lsh,0,
+tr_set1_trust,in_degree,7,
+tr_domain_mass,ppr,0,
+tr_domain_mass,lsh,0,
+tr_domain_mass,in_degree,7,
+ppr,lsh,1,
+ppr,in_degree,0,
+lsh,in_degree,0,
+합집합,,39,
