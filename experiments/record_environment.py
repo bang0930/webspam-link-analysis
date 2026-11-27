@@ -110,7 +110,7 @@ def main(argv=None):
     path = args.out_dir / 'environment.csv'
     fields = list(dict.fromkeys(k for row in rows for k in row))
     with path.open('w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fields)
+        writer = csv.DictWriter(f, fields, lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
     for row in rows:
