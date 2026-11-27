@@ -2,7 +2,7 @@
 
 SCE331 Data Mining Team Project
 
-> 학번, 최종 보고서와 영상, 제출 commit hash는 제출 전에 확정합니다.
+> 보고서에 적은 제출 commit hash가 채점 기준 버전입니다.
 
 ## Overview
 
@@ -23,9 +23,9 @@ SCE331 Data Mining Team Project
 
 | 이름 | 학번 | 담당 |
 |---|---|---|
-| 김현중 | 🚧 | 데이터 불러오기, MinHash/LSH, baseline, EDA, README |
-| 박병언 | 🚧 | 공통 엔진, PageRank, TrustRank, Spam Mass, seed 실험 |
-| 강민수 | 🚧 | 데이터 분할, 채점, PPR, 최종 비교표, error analysis |
+| 김현중 | 202220805 | 데이터 불러오기, MinHash/LSH, baseline, EDA, README |
+| 박병언 |  | 공통 엔진, PageRank, TrustRank, Spam Mass, seed 실험 |
+| 강민수 |  | 데이터 분할, 채점, PPR, 최종 비교표, error analysis |
 
 팀 번호: G06
 
@@ -40,7 +40,7 @@ webspam-link-analysis/
 ├── docs/
 │   ├── STRUCTURE.md           # 프로젝트 확정안
 │   ├── AI_USAGE.md            # AI 사용 기록
-│   └── REFERENCES.md          # IEEE 형식 참고문헌 초안
+│   └── REFERENCES.md          # IEEE 형식 참고문헌
 ├── scripts/
 │   └── download_data.py       # 원본 데이터 다운로드
 ├── src/                       # 팀 작성 알고리즘과 분석 함수
@@ -69,7 +69,6 @@ webspam-link-analysis/
 │   ├── cv_ppr.py              # PPR 설정의 SET1 검증
 │   └── error_analysis.py      # 놓친 스팸과 오탐 정상 분석
 ├── tests/                     # pytest (합성 데이터 + 실제 데이터 통계 대조)
-├── notebooks/                 # EDA·확인용 (보고서 그림은 만들지 않음)
 ├── results/
 │   ├── tables/                # 결과 표 (.csv)
 │   └── figures/               # 결과 그림 (.png)
@@ -322,7 +321,7 @@ IEEE 형식 참고문헌과 인용 위치는 [docs/REFERENCES.md](docs/REFERENCE
 
 외부 라이브러리: numpy, scipy, pandas, scikit-learn(분할·평가 지표), networkx(PageRank 검증), matplotlib, pytest — 버전은 `requirements.txt`에 고정
 
-외부 코드를 가져오거나 수정해 쓴 경우 해당 파일 머리말에 출처와 라이선스를 적습니다. 현재 별도 외부 소스 코드를 가져온 항목은 기록되어 있지 않습니다.
+`src/`, `experiments/`, `scripts/`, `tests/`의 코드는 모두 팀이 작성했습니다 (파일 머리말에 담당자 표시). 외부에서 가져오거나 수정해 쓴 소스 코드는 없고, 외부 코드는 위 라이브러리를 호출하는 것뿐입니다.
 
 ## AI-use statement
 
