@@ -328,6 +328,7 @@ def make_figures(ctx, scores, tables) -> list[Path]:
     seed_scores = {k: v[config.SEED] for k, v in scores.items()}
     title = None if ctx.mode == "final" else "CHECK MODE (SET1 fold 0) - not report numbers"
     return [
+        *([F.fig_rank_buckets(tables["ranking"], float(ctx.target.y.mean()), out_dir, name=f"{prefix}fig_rank_buckets", title=title)] if "ranking" in tables else []),
         F.fig_final_table(tables["table"], float(ctx.target.y.mean()), out_dir,
                           name=f"{prefix}fig_final_pr_auc", title=title),
         F.fig_pr_curves(seed_scores, ctx.target, families=fams, out_dir=out_dir,

@@ -127,8 +127,76 @@ def fig_caught_overlap(caught_df, out_dir: Path | None = None,
 
 
 # ---------------------------------------------------------------------------
-# 박병언: seed·damping 곡선, PageRank vs TrustRank 구간별 그림 (작성 예정)
+# 박병언: seed 개수, damping 곡선, PageRank vs TrustRank 구간별 그림
 # ---------------------------------------------------------------------------
+
+
+def fig_rank_buckets(table, base_rate, out_dir=None, name="fig_rank_buckets", title=None):
+    """담당: 박병언 (팀 작성 코드). 확정안 6절, 8.1절, 강의 11강 p73-78.
+
+    두 순위의 구간별 스팸 비율과 도메인 bootstrap 구간을 나란히 그린다.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharey=True)
+    for ax, key, label in zip(axes, ("pagerank", "trustrank_set1"), ("PageRank", "TrustRank (SET1 seeds)")):
+        d = table[table.ranking == key].sort_values("bucket")
+        cis = np.array([_parse_ci(v) for v in d.ci95])
+        ax.vlines(d.bucket, cis[:, 0], cis[:, 1], color="#2b6cb0")
+        ax.plot(d.bucket, d.spam_rate, "o-", color="#2b6cb0")
+        ax.axhline(base_rate, ls="--", color="#555555", label=f"Eval spam share = {base_rate:.3f}")
+        ax.set(title=label, xlabel="Rank bucket (1 = highest)", xticks=range(1, 11))
+        ax.grid(alpha=.25)
+        ax.legend(fontsize=8)
+    axes[0].set_ylabel("Spam fraction, 95% domain-bootstrap CI")
+    if title:
+        fig.suptitle(title)
+    return savefig(fig, name, out_dir)
+
+
+def _fig_sensitivity(table, xcolumn, name, out_dir, check=False, seed_methods=False):
+    """민감도 요약 표를 그린다. 선택에 사용하지 않는 분석임을 그림에 표시한다."""
+    fig, ax = plt.subplots(figsize=(7.5, 4.6))
+    for (split, method, seed_method), d in table.groupby(["split", "method", "seed_method"]):
+        d = d.sort_values(xcolumn)
+        x = d[xcolumn].to_numpy(dtype=float)
+        y = d.pr_auc_mean.to_numpy(dtype=float)
+        stdcol = "pr_auc_fold_std" if name == "fig_damping_curve" else "pr_auc_std"
+        sd = d[stdcol].to_numpy(dtype=float)
+        label = f"{split}, {method}"
+        if seed_methods:
+            label += f", {seed_method}"
+        ax.plot(x, y, "o-" if split == "validation" else "s--", label=label)
+        ax.fill_between(x, y - sd, y + sd, alpha=.12)
+    if xcolumn == "n_seeds":
+        ax.set_xscale("log")
+        ax.set_xlabel("Actual seed count (log scale)")
+    else:
+        ax.set_xlabel("Damping")
+    ax.set_ylabel("PR-AUC (average precision)")
+    ax.set_title(("CHECK MODE - not report numbers\n" if check else "") + "Analysis only: no selection from SET2")
+    ax.grid(alpha=.25)
+    ax.legend(fontsize=7)
+    note = ("All seeds: same set in every repeat, repeat SD = 0. Validation x = mean fold seed count."
+            if name == "fig_seed_curve" else
+            "Bands: fold SD. PPR damping not included." if name == "fig_damping_curve" else
+            "Bands: repeat SD; PageRank-top uses one run. No method selection.")
+    fig.text(.5, .01, note, ha="center", fontsize=7)
+    fig.subplots_adjust(bottom=.18)
+    return savefig(fig, name, out_dir)
+
+
+def fig_seed_curve(table, out_dir=None, check=False):
+    """담당: 박병언 (팀 작성 코드). seed 개수 곡선, 확정안 6절, 8.2절, 강의 11강 p77-78."""
+    return _fig_sensitivity(table, "n_seeds", "fig_seed_curve", out_dir, check)
+
+
+def fig_seed_methods(table, out_dir=None, check=False):
+    """담당: 박병언 (팀 작성 코드). seed 방식 비교, 확정안 8.2절, 9절, 강의 11강 p77-78."""
+    return _fig_sensitivity(table, "n_seeds", "fig_seed_methods", out_dir, check, True)
+
+
+def fig_damping_curve(table, out_dir=None, check=False):
+    """담당: 박병언 (팀 작성 코드). damping 곡선, 확정안 6절, 9절, 강의 11강 p17-18, p76."""
+    return _fig_sensitivity(table, "damping", "fig_damping_curve", out_dir, check)
 
 
 # ---------------------------------------------------------------------------
